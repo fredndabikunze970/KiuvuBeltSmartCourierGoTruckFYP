@@ -1,0 +1,137 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { apiService } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, CheckCircle, Package } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+
+export function DeliveryVerification() {
+  const [formData, setFormData] = useState({
+    packageId: "",
+    pickupCode: "",
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
+  const { toast } = useToast()
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    try {
+      await apiService.verifyDelivery(formData.packageId, formData.pickupCode)
+
+      setSuccess(true)
+      toast({
+        title: "Delivery Verified",
+        description: "Package has been successfully delivered and verified",
+      })
+
+      // Reset form
+      setFormData({
+        packageId: "",
+        pickupCode: "",
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <Card>
+        <CardContent className="text-center py-12">
+          <div className="mx-auto bg-green-100 text-green-600 p-3 rounded-full w-fit mb-4">
+            <CheckCircle className="h-8 w-8" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-green-600">Delivery Verified Successfully!</h3>
+          <p className="text-muted-foreground mb-4">The package has been marked as delivered in our system.</p>
+          <Button onClick={() => setSuccess(false)} variant="outline">
+            Verify Another Package
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Package className="h-5 w-5" />
+          Verify Delivery
+        </CardTitle>
+        <CardDescription>
+          Enter the package ID and pickup code to verify delivery. Only the receiver should have the pickup code.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="packageId">Package ID *</Label>
+            <Input
+              id="packageId"
+              placeholder="PKG-ABC123"
+              value={formData.packageId}
+              onChange={(e) => handleInputChange("packageId", e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pickupCode">Pickup Code *</Label>
+            <Input
+              id="pickupCode"
+              placeholder="6-digit pickup code"
+              value={formData.pickupCode}
+              onChange={(e) => handleInputChange("pickupCode", e.target.value.toUpperCase())}
+              maxLength={6}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={loading || !formData.packageId || !formData.pickupCode}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify Delivery"
+            )}
+          </Button>
+        </form>
+
+        <div className="mt-4 p-4 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            <strong>Note:</strong> The pickup code is provided to the receiver when the package is registered. This
+            ensures that only the intended recipient can confirm delivery.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
