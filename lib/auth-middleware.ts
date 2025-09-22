@@ -2,9 +2,9 @@ import jwt from "jsonwebtoken"
 import type { NextRequest } from "next/server"
 
 export interface AuthUser {
-  id: string
+  id: number
   email: string
-  role: "agent" | "admin"
+  role: "admin" | "agent" | "customer"
 }
 
 export function verifyToken(token: string): AuthUser | null {
@@ -28,4 +28,30 @@ export function getAuthUser(request: NextRequest): AuthUser | null {
 
   const token = authHeader.substring(7)
   return verifyToken(token)
+}
+
+export function requireAuth(handler: (request: NextRequest, user: AuthUser) => Promise<Response>) {
+  return async (request: NextRequest) => {
+    const user = getAuthUser(request)
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+    return handler(request, user)
+  }
+}
+
+export function requireAdmin(handler: (request: NextRequest, user: AuthUser) => Promise<Response>) {
+  return async (request: NextRequest) => {
+    const user = getAuthUser(request)
+    if (!user || user.role !== "admin") {
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+    return handler(request, user)
+  }
 }

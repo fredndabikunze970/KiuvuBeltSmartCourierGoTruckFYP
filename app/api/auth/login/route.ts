@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import pool from "@/lib/database"
+import { sql } from "@/lib/database"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,14 +11,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
 
-    // Get user from database
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email])
+    const result = await sql`SELECT * FROM users WHERE email = ${email}`
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    const user = result.rows[0]
+    const user = result[0]
 
     // Check if user is active
     if (user.status !== "active") {
@@ -42,17 +41,17 @@ export async function POST(request: NextRequest) {
       { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
     )
 
-    // Update last login
-    await pool.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id])
+    await sql`UPDATE users SET updated_at = NOW() WHERE id = ${user.id}`
 
     return NextResponse.json({
+      success: true,
       token,
       user: {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        phone: user.phone,
+        phone_number: user.phone_number,
       },
     })
   } catch (error) {

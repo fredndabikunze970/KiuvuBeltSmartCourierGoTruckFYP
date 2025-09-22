@@ -63,22 +63,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navItems = user?.role === "admin" ? adminNavItems : agentNavItems
 
   const NavContent = () => (
-    <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b px-6">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground p-2 rounded-lg">
+    <div className="flex h-full flex-col bg-sidebar border-r border-sidebar-border">
+      <div className="flex h-16 items-center border-b border-sidebar-border px-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary text-primary-foreground p-2.5 rounded-xl shadow-sm">
             <Truck className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-bold text-lg">KIVU Belt</h1>
-            <p className="text-xs text-muted-foreground">Express</p>
+            <h1 className="font-bold text-lg text-sidebar-foreground">KIVU Belt</h1>
+            <p className="text-xs text-sidebar-foreground/70 font-medium">Express</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-4 py-4">
+      <nav className="flex-1 space-y-1 px-4 py-6">
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -86,29 +84,30 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
               onClick={() => setSidebarOpen(false)}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-5 w-5" />
               {item.label}
             </Link>
           )
         })}
       </nav>
 
-      {/* User Info */}
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>{user?.fullName?.charAt(0) || "U"}</AvatarFallback>
+      <div className="border-t border-sidebar-border p-4">
+        <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar-accent/50">
+          <Avatar className="h-10 w-10 border-2 border-sidebar-primary/20">
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              {user?.fullName?.charAt(0) || "U"}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{user?.fullName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+            <p className="text-sm font-semibold text-sidebar-foreground truncate">{user?.fullName}</p>
+            <p className="text-xs text-sidebar-foreground/70 capitalize">{user?.role}</p>
           </div>
         </div>
       </div>
@@ -118,69 +117,70 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:border-r">
+      <div className="hidden lg:flex lg:w-72 lg:flex-col">
         <NavContent />
       </div>
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-72 p-0">
           <NavContent />
         </SheetContent>
       </Sheet>
 
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex h-16 items-center justify-between border-b bg-background px-6">
+        <header className="flex h-16 items-center justify-between border-b bg-card/50 backdrop-blur-sm px-6">
           <div className="flex items-center gap-4">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="lg:hidden">
+                <Button variant="ghost" size="sm" className="lg:hidden hover:bg-accent">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
             </Sheet>
 
             <div>
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-xl font-bold text-foreground">
                 {pathname === "/dashboard" ? "Dashboard" : pathname.split("/").pop()?.replace("-", " ") || "Dashboard"}
               </h2>
               <p className="text-sm text-muted-foreground">Welcome back, {user?.fullName}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <Button variant="ghost" size="sm">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" className="relative hover:bg-accent">
               <Bell className="h-5 w-5" />
+              <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full"></span>
             </Button>
 
-            {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{user?.fullName?.charAt(0) || "U"}</AvatarFallback>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent">
+                  <Avatar className="h-10 w-10 border-2 border-primary/20">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      {user?.fullName?.charAt(0) || "U"}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-64" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.fullName}</p>
+                    <p className="text-sm font-semibold leading-none">{user?.fullName}</p>
                     <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    <p className="text-xs leading-none text-primary capitalize font-medium">{user?.role}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/profile">
+                  <Link href="/dashboard/profile" className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     Profile Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
@@ -189,8 +189,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto bg-background">{children}</main>
       </div>
     </div>
   )
