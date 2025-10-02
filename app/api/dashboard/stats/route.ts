@@ -102,12 +102,13 @@ export async function GET() {
       recentPackages = [];
     }
 
-    // Get fleet statistics from Firebase
+    // Get fleet statistics from Firebase with enhanced data
     let fleetStats = {
       total_vehicles: 0,
       active_vehicles: 0,
       available_vehicles: 0,
-      maintenance_vehicles: 0
+      maintenance_vehicles: 0,
+      vehicles: []
     };
 
     try {
@@ -117,7 +118,11 @@ export async function GET() {
       const vehicles = snapshot.val();
 
       if (vehicles) {
-        const vehiclesArray = Object.values(vehicles) as any[];
+        const vehiclesArray = Object.entries(vehicles).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        }));
+        
         console.log(`Found ${vehiclesArray.length} vehicles in Firebase`);
         
         fleetStats = {
@@ -130,33 +135,36 @@ export async function GET() {
           ).length,
           maintenance_vehicles: vehiclesArray.filter(vehicle => 
             vehicle.status === 'maintenance'
-          ).length
+          ).length,
+          vehicles: vehiclesArray
         };
         console.log('Firebase fleet stats successful:', fleetStats);
       } else {
         console.log('No vehicles found in Firebase');
         firebaseError = 'No vehicles data found in Firebase';
-        // Use sample data for development
-        fleetStats = {
-          total_vehicles: 2,
-          active_vehicles: 1,
-          available_vehicles: 1,
-          maintenance_vehicles: 0
-        };
       }
     } catch (firebaseErr) {
       firebaseError = `Firebase vehicles error: ${firebaseErr}`;
       console.error('Firebase vehicles error:', firebaseErr);
-      // Use sample data for development
-      fleetStats = {
-        total_vehicles: 2,
-        active_vehicles: 1,
-        available_vehicles: 1,
-        maintenance_vehicles: 0
-      };
     }
 
-    // Prepare the response data with debug information
+    // Get location history for vehicles
+    let locationHistory = {};
+    try {
+      console.log('Fetching location history from Firebase...');
+      const locationHistoryRef = database.ref('location_history');
+      const locationSnapshot = await locationHistoryRef.once('value');
+      const historyData = locationSnapshot.val();
+      
+      if (historyData) {
+        locationHistory = historyData;
+        console.log('Location history fetched successfully');
+      }
+    } catch (historyError) {
+      console.error('Error fetching location history:', historyError);
+    }
+
+    // Prepare the response data with enhanced fleet information
     const responseData = {
       // Real data from databases
       packageStats: packageStats?.[0] || {
@@ -174,6 +182,7 @@ export async function GET() {
       },
       recentPackages,
       fleetStats,
+      locationHistory,
       
       // Debug information
       debug: {
@@ -194,6 +203,7 @@ export async function GET() {
       paymentCount: responseData.paymentStats.total_payments,
       recentPackagesCount: responseData.recentPackages.length,
       fleetCount: responseData.fleetStats.total_vehicles,
+      locationHistoryCount: Object.keys(responseData.locationHistory).length,
       errors: {
         database: databaseError,
         firebase: firebaseError
@@ -226,8 +236,10 @@ export async function GET() {
         total_vehicles: 0,
         active_vehicles: 0,
         available_vehicles: 0,
-        maintenance_vehicles: 0
+        maintenance_vehicles: 0,
+        vehicles: []
       },
+      locationHistory: {},
       
       // Detailed error information
       debug: {

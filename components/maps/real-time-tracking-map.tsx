@@ -1,13 +1,15 @@
+// components/maps/real-time-tracking-map.tsx
 'use client';
 
 import { db } from '@/lib/firebase-client';
 import { off, onValue, ref } from 'firebase/database';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Navigation, Clock, User, Truck, Package, Loader2, Satellite, Car, Wrench } from 'lucide-react';
+import { MapPin, Navigation, Clock, User, Truck, Package, Loader2, History, Route, Eye, EyeOff, Car, Wrench, RefreshCw } from 'lucide-react';
+import { geocodingService } from '@/utils/geocoding-services';
 
 // Fix for default markers in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -32,11 +34,64 @@ interface TruckLocation {
     heading?: number;
     accuracy?: number;
     address?: string;
+    fullAddress?: string;
+    district?: string;
+    sector?: string;
+    coordinatesDisplay?: string;
+    geocodingStatus: 'pending' | 'loading' | 'completed' | 'failed';
     assigned_packages?: string[];
     route_coordinates?: Array<{ latitude: number; longitude: number; timestamp: string }>;
 }
 
-// Enhanced truck icons with better design
+interface LocationHistory {
+    [vehicleId: string]: {
+        [timestamp: string]: {
+            latitude: number;
+            longitude: number;
+            speed?: number;
+            heading?: number;
+            accuracy?: number;
+            address?: string;
+        };
+    };
+}
+
+// Format to Rwandan time
+const formatRwandaTime = (timestamp: string | number | Date): string => {
+    try {
+        const date = typeof timestamp === 'string' ? new Date(parseInt(timestamp)) : new Date(timestamp);
+        return date.toLocaleTimeString('en-RW', {
+            timeZone: 'Africa/Kigali',
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    } catch {
+        return new Date().toLocaleTimeString('en-RW', {
+            timeZone: 'Africa/Kigali',
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+};
+
+const formatRwandaDateTime = (timestamp: string | number | Date): string => {
+    try {
+        const date = typeof timestamp === 'string' ? new Date(parseInt(timestamp)) : new Date(timestamp);
+        return date.toLocaleDateString('en-RW', {
+            timeZone: 'Africa/Kigali',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }) + ' at ' + formatRwandaTime(timestamp);
+    } catch {
+        return 'Invalid date';
+    }
+};
+
+// Enhanced truck icons
 const createTruckIcon = (status: string, plateNumber: string, speed?: number) => {
     const color =
         status === 'in_transit' ? '#3b82f6' :
@@ -44,182 +99,170 @@ const createTruckIcon = (status: string, plateNumber: string, speed?: number) =>
                 status === 'maintenance' ? '#f59e0b' :
                     '#ef4444';
 
-    const iconSize = speed && speed > 0 ? 'w-14 h-14' : 'w-12 h-12';
-    const pulseAnimation = status === 'in_transit' ? 'animate-pulse' : '';
+    const isMoving = speed && speed > 2;
 
     return L.divIcon({
         html: `
-            <div class="relative flex flex-col items-center">
-                <div class="relative ${pulseAnimation}">
-                    <div class="${iconSize} rounded-full bg-white border-3 shadow-lg flex items-center justify-center transition-all duration-300" style="border-color: ${color}">
-                        <div class="text-2xl">🚚</div>
-                        ${speed && speed > 0 ? `
-                            <div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-ping"></div>
-                        ` : ''}
-                    </div>
-                    <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white rotate-45 border-r border-b" style="border-color: ${color}"></div>
-                </div>
-                <div class="mt-1 px-2 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap shadow-sm" style="background-color: ${color}">
-                    ${plateNumber}
-                </div>
-            </div>
-        `,
+      <div class="relative flex flex-col items-center">
+        <div class="relative ${isMoving ? 'animate-pulse' : ''}">
+          <div class="w-8 h-8 rounded-full bg-white border-2 shadow-lg flex items-center justify-center transition-all duration-300" style="border-color: ${color}">
+            <div class="text-lg">🚚</div>
+            ${isMoving ? `
+              <div class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white animate-ping"></div>
+            ` : ''}
+          </div>
+          <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rotate-45 border-r border-b" style="border-color: ${color}"></div>
+        </div>
+        <div class="mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white whitespace-nowrap shadow-sm" style="background-color: ${color}">
+          ${plateNumber || 'RAA XXX'}
+        </div>
+      </div>
+    `,
         className: 'truck-marker',
-        iconSize: [70, 70],
-        iconAnchor: [35, 55],
+        iconSize: [16, 16],
+        iconAnchor: [8, 16],
     });
 };
 
 // Map updater component
-function MapUpdater({ locations }: { locations: TruckLocation[] }) {
+function MapUpdater({ locations, autoZoom }: { locations: TruckLocation[], autoZoom: boolean }) {
     const map = useMap();
 
     useEffect(() => {
-        if (locations.length > 0) {
+        if (locations.length > 0 && autoZoom) {
             const group = new L.FeatureGroup(
                 locations.map(loc => L.marker([loc.latitude, loc.longitude]))
             );
-            map.fitBounds(group.getBounds().pad(0.1));
+
+            const bounds = group.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds.pad(0.1), {
+                    maxZoom: 16,
+                    animate: true
+                });
+            }
         }
-    }, [locations, map]);
+    }, [locations, map, autoZoom]);
 
     return null;
 }
 
-// Geocoding service using OpenStreetMap Nominatim API
-const geocodeLocation = async (latitude: number, longitude: number): Promise<string | null> => {
-    try {
-        const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
-            {
-                headers: {
-                    'User-Agent': 'DeliveryDashboard/1.0',
-                    'Accept-Language': 'en'
-                }
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`Geocoding failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data && data.display_name) {
-            return data.display_name;
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Geocoding error:', error);
-        return null;
-    }
-};
-
-// Custom hook for real-time vehicle data with geocoding and auto-refresh
+// Custom hook for real-time vehicle data
 function useRealTimeVehicles() {
     const [truckLocations, setTruckLocations] = useState<TruckLocation[]>([]);
+    const [locationHistory, setLocationHistory] = useState<LocationHistory>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [refreshCount, setRefreshCount] = useState(0);
-
-    // Function to process vehicle data with geocoding
-    const processVehicleData = async (vehiclesData: any): Promise<TruckLocation[]> => {
-        const locations: TruckLocation[] = [];
-        const processedVehicles = Object.entries(vehiclesData);
-
-        // First pass: create location objects without geocoding
-        for (const [vehicleId, vehicle] of processedVehicles) {
-            if (vehicle?.current_location?.latitude && vehicle?.current_location?.longitude) {
-                const locationData: TruckLocation = {
-                    id: vehicleId,
-                    vehicle_id: vehicle.vehicle_id || vehicleId,
-                    plate_number: vehicle.plate_number || 'UNKNOWN',
-                    model: vehicle.model || 'Unknown Model',
-                    latitude: vehicle.current_location.latitude,
-                    longitude: vehicle.current_location.longitude,
-                    driver_name: vehicle.driver_name || `Driver ${vehicle.driver_id || 'Unknown'}`,
-                    driver_id: vehicle.driver_id || 'unknown',
-                    last_updated: new Date(vehicle.last_updated || vehicle.current_location.timestamp || Date.now()).toISOString(),
-                    status: vehicle.status || 'unknown',
-                    speed: vehicle.current_location.speed,
-                    heading: vehicle.current_location.heading,
-                    accuracy: vehicle.current_location.accuracy,
-                    address: vehicle.current_location.address,
-                    assigned_packages: vehicle.assigned_packages || []
-                };
-
-                // Add route history if available
-                if (vehicle.route_history) {
-                    locationData.route_coordinates = Object.values(vehicle.route_history)
-                        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                        .slice(-10);
-                }
-
-                locations.push(locationData);
-            }
-        }
-
-        return locations;
-    };
-
-    // Function to refresh geocoded addresses for all vehicles
-    const refreshGeocodedAddresses = async (locations: TruckLocation[]): Promise<TruckLocation[]> => {
-        const refreshedLocations = [...locations];
-
-        const geocodingPromises = refreshedLocations.map(async (truck, index) => {
-            try {
-                // Only geocode if we don't have an address or it's time to refresh
-                if (!truck.address || refreshCount % 3 === 0) { // Refresh address every 15 seconds (3 cycles)
-                    const geocodedAddress = await geocodeLocation(truck.latitude, truck.longitude);
-                    if (geocodedAddress) {
-                        refreshedLocations[index] = {
-                            ...truck,
-                            address: geocodedAddress
-                        };
-                    }
-                }
-            } catch (error) {
-                console.warn(`Failed to geocode for vehicle ${truck.id}:`, error);
-            }
-        });
-
-        await Promise.allSettled(geocodingPromises);
-        return refreshedLocations;
-    };
 
     useEffect(() => {
-        let unsubscribe: (() => void) | undefined;
-        let refreshInterval: NodeJS.Timeout | undefined;
+        let unsubscribeVehicles: (() => void) | undefined;
+        let unsubscribeHistory: (() => void) | undefined;
 
         const setupRealTimeTracking = async () => {
             try {
-                console.log('Setting up real-time listener for vehicles...');
                 const vehiclesRef = ref(db, 'vehicles');
+                const historyRef = ref(db, 'location_history');
 
-                unsubscribe = onValue(vehiclesRef, async (snapshot) => {
-                    const vehiclesData = snapshot.val();
+                unsubscribeVehicles = onValue(vehiclesRef, async (vehiclesSnapshot) => {
+                    const vehiclesData = vehiclesSnapshot.val();
 
-                    if (vehiclesData) {
-                        try {
-                            // Process vehicle data first
-                            const processedLocations = await processVehicleData(vehiclesData);
+                    unsubscribeHistory = onValue(historyRef, async (historySnapshot) => {
+                        const historyData = historySnapshot.val();
 
-                            // Then update with geocoded addresses
-                            const locationsWithAddresses = await refreshGeocodedAddresses(processedLocations);
+                        if (vehiclesData) {
+                            try {
+                                const locations: TruckLocation[] = [];
 
-                            setTruckLocations(locationsWithAddresses);
-                            setError(null);
-                        } catch (processingError) {
-                            console.error('Error processing vehicle data:', processingError);
+                                // First pass: create locations with coordinates only
+                                Object.entries(vehiclesData).forEach(([vehicleId, vehicle]: [string, any]) => {
+                                    if (vehicle?.current_location?.latitude && vehicle?.current_location?.longitude) {
+                                        const coordinatesDisplay = geocodingService.getCoordinatesDisplay(
+                                            vehicle.current_location.latitude,
+                                            vehicle.current_location.longitude
+                                        );
+
+                                        const locationData: TruckLocation = {
+                                            id: vehicleId,
+                                            vehicle_id: vehicle.vehicle_id || vehicleId,
+                                            plate_number: vehicle.plate_number || `RAA ${vehicleId.slice(-3).toUpperCase()}A`,
+                                            model: vehicle.model || 'Delivery Truck',
+                                            latitude: vehicle.current_location.latitude,
+                                            longitude: vehicle.current_location.longitude,
+                                            driver_name: vehicle.driver_name || `Driver ${vehicle.driver_id || '001'}`,
+                                            driver_id: vehicle.driver_id || `DRV${vehicleId.slice(-3)}`,
+                                            last_updated: vehicle.last_updated || new Date().toISOString(),
+                                            status: vehicle.status || 'in_transit',
+                                            speed: vehicle.current_location.speed,
+                                            heading: vehicle.current_location.heading,
+                                            accuracy: vehicle.current_location.accuracy,
+                                            coordinatesDisplay: coordinatesDisplay,
+                                            geocodingStatus: 'pending',
+                                            assigned_packages: vehicle.assigned_packages || []
+                                        };
+
+                                        locations.push(locationData);
+                                    }
+                                });
+
+                                // Set initial state with coordinates only
+                                setTruckLocations(locations);
+                                setLocationHistory(historyData || {});
+                                setError(null);
+                                setLoading(false);
+
+                                // Second pass: geocode addresses in background
+                                locations.forEach(async (location) => {
+                                    try {
+                                        setTruckLocations(prev => prev.map(loc =>
+                                            loc.id === location.id ? { ...loc, geocodingStatus: 'loading' } : loc
+                                        ));
+
+                                        const geocodeResult = await geocodingService.geocode(
+                                            location.latitude,
+                                            location.longitude
+                                        );
+
+                                        setTruckLocations(prev => prev.map(loc =>
+                                            loc.id === location.id ? {
+                                                ...loc,
+                                                address: geocodeResult.address,
+                                                fullAddress: geocodeResult.fullAddress,
+                                                district: geocodeResult.district,
+                                                sector: geocodeResult.sector,
+                                                geocodingStatus: 'completed'
+                                            } : loc
+                                        ));
+
+                                    } catch (error) {
+                                        console.warn(`Geocoding failed for vehicle ${location.id}:`, error);
+                                        setTruckLocations(prev => prev.map(loc =>
+                                            loc.id === location.id ? {
+                                                ...loc,
+                                                geocodingStatus: 'failed',
+                                                address: location.coordinatesDisplay + ' (Geocoding failed)'
+                                            } : loc
+                                        ));
+                                    }
+                                });
+
+                            } catch (processingError) {
+                                console.error('Error processing vehicle data:', processingError);
+                                setError('Failed to process vehicle data');
+                                setLoading(false);
+                            }
+                        } else {
+                            setTruckLocations([]);
+                            setLocationHistory({});
+                            setLoading(false);
                         }
-                    } else {
-                        setTruckLocations([]);
-                    }
+                    }, (historyError) => {
+                        console.error('Firebase history listener error:', historyError);
+                        setError('Failed to load location history');
+                        setLoading(false);
+                    });
 
-                    setLoading(false);
-                }, (error) => {
-                    console.error('Firebase listener error:', error);
+                }, (vehiclesError) => {
+                    console.error('Firebase vehicles listener error:', vehiclesError);
                     setError('Failed to connect to real-time tracking service');
                     setLoading(false);
                 });
@@ -231,117 +274,286 @@ function useRealTimeVehicles() {
             }
         };
 
-        // Setup real-time tracking
         setupRealTimeTracking();
 
-        // Setup auto-refresh interval for geocoding (every 5 seconds)
-        refreshInterval = setInterval(() => {
-            setRefreshCount(prev => prev + 1);
-            setTruckLocations(prev => {
-                if (prev.length > 0) {
-                    // Trigger a re-render and potential address refresh
-                    return [...prev];
-                }
-                return prev;
-            });
-        }, 5000); // 5 seconds
-
-        // Cleanup function
         return () => {
-            if (unsubscribe) {
-                unsubscribe();
-            }
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
+            if (unsubscribeVehicles) unsubscribeVehicles();
+            if (unsubscribeHistory) unsubscribeHistory();
         };
-    }, [refreshCount]);
+    }, []);
 
-    return { truckLocations, loading, error };
+    return { truckLocations, locationHistory, loading, error };
 }
 
-// Tile layer configuration
-const tileLayers = {
-    standard: {
-        url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        name: "Street Map"
-    },
-    satellite: {
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
-        name: "Satellite View"
-    },
-    transit: {
-        url: "https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=your-api-key",
-        attribution: '&copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
-        name: "Transit Map"
-    }
-};
+// Fleet Overview Component
+function FleetOverviewPanel({
+    isVisible,
+    onToggle,
+    truckLocations
+}: {
+    isVisible: boolean;
+    onToggle: () => void;
+    truckLocations: TruckLocation[];
+}) {
+    if (!isVisible) return null;
 
-// Format the address to be more readable
-const formatAddress = (address: string): string => {
-    if (!address) return 'Acquiring location information...';
+    const inTransitVehicles = truckLocations.filter(truck => truck.status === 'in_transit');
+    const availableVehicles = truckLocations.filter(truck => truck.status === 'available');
+    const maintenanceVehicles = truckLocations.filter(truck => truck.status === 'maintenance');
 
-    try {
-        const parts = address.split(',');
-        const cleanParts = parts.map(part => part.trim()).filter(part => part.length > 0);
+    return (
+        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl p-4 min-w-[220px] border border-slate-200 z-[1000]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                    <Truck className="h-4 w-4 text-blue-600" />
+                    <h4 className="font-bold text-slate-800 text-sm">Fleet Overview</h4>
+                </div>
+                <button
+                    onClick={onToggle}
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                    <EyeOff className="h-4 w-4" />
+                </button>
+            </div>
+            <div className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                    <span className="text-xs font-semibold text-slate-700">Total Vehicles</span>
+                    <span className="font-bold text-slate-900 text-lg">{truckLocations.length}</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-xs text-slate-600">In Transit</span>
+                    </div>
+                    <span className="font-bold text-blue-600 text-sm">{inTransitVehicles.length}</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-xs text-slate-600">Available</span>
+                    </div>
+                    <span className="font-bold text-green-600 text-sm">{availableVehicles.length}</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <span className="text-xs text-slate-600">Maintenance</span>
+                    </div>
+                    <span className="font-bold text-amber-600 text-sm">{maintenanceVehicles.length}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-        if (cleanParts.length <= 3) {
-            return cleanParts.join(', ');
+// Vehicle History Component
+function VehicleHistoryPanel({
+    vehicle,
+    locationHistory,
+    isExpanded
+}: {
+    vehicle: TruckLocation;
+    locationHistory: LocationHistory;
+    isExpanded: boolean;
+}) {
+    const [historyPoints, setHistoryPoints] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(true);
+
+    useEffect(() => {
+        const loadHistoryData = async () => {
+            if (!vehicle || !locationHistory[vehicle.id]) {
+                setHistoryPoints([]);
+                setLoadingHistory(false);
+                return;
+            }
+
+            try {
+                const vehicleHistory = locationHistory[vehicle.id];
+                const historyEntries = Object.entries(vehicleHistory)
+                    .sort(([a], [b]) => parseInt(b) - parseInt(a))
+                    .slice(0, 6);
+
+                const historyWithAddresses = await Promise.all(
+                    historyEntries.map(async ([timestamp, data]: [string, any]) => {
+                        let address = data.address;
+                        let formattedAddress = '';
+
+                        try {
+                            if (!address) {
+                                const geocodeResult = await geocodingService.geocode(data.latitude, data.longitude);
+                                address = geocodeResult.address;
+                            }
+
+                            if (address) {
+                                formattedAddress = address;
+                            }
+                        } catch (error) {
+                            console.warn('Failed to geocode history point:', error);
+                            address = geocodingService.getCoordinatesDisplay(data.latitude, data.longitude);
+                            formattedAddress = address;
+                        }
+
+                        return {
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            timestamp,
+                            address: address || 'Address not available',
+                            formattedAddress: formattedAddress || 'Acquiring location information...',
+                            speed: data.speed
+                        };
+                    })
+                );
+
+                setHistoryPoints(historyWithAddresses);
+            } catch (error) {
+                console.error('Error loading history data:', error);
+                setHistoryPoints([]);
+            } finally {
+                setLoadingHistory(false);
+            }
+        };
+
+        if (isExpanded) {
+            loadHistoryData();
         }
+    }, [vehicle, locationHistory, isExpanded]);
 
-        return cleanParts.slice(0, Math.min(cleanParts.length, 4)).join(', ');
-    } catch (error) {
-        return address;
-    }
-};
+    if (!isExpanded) return null;
+
+    return (
+        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl p-4 min-w-[300px] max-w-[400px] border border-slate-200 max-h-80 overflow-y-auto z-[1000]">
+            <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                    <History className="h-4 w-4 text-blue-600" />
+                    <span>Vehicle History - {vehicle.plate_number}</span>
+                </h4>
+            </div>
+
+            {loadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                    <span className="ml-2 text-sm text-slate-600">Loading history...</span>
+                </div>
+            ) : historyPoints.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                    No history data available for this vehicle
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {historyPoints.map((point, index) => (
+                        <div key={point.timestamp} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span className="text-xs font-bold text-blue-600">{index + 1}</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-700">
+                                            {formatRwandaTime(point.timestamp)}
+                                        </p>
+                                        {point.speed && (
+                                            <p className="text-xs text-slate-500">
+                                                Speed: {(point.speed * 3.6).toFixed(1)} km/h
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-xs text-slate-500 bg-white px-2 py-1 rounded border">
+                                    📍 {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-tight bg-white/60 p-2 rounded border border-slate-100">
+                                {point.formattedAddress}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function EnhancedRealTimeTrackingMap() {
-    const { truckLocations, loading, error } = useRealTimeVehicles();
+    const { truckLocations, locationHistory, loading, error } = useRealTimeVehicles();
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-    const [mapType, setMapType] = useState<'standard' | 'satellite' | 'transit'>('standard');
-    const [refreshingTrucks, setRefreshingTrucks] = useState<Set<string>>(new Set());
+    const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+    const [showRouteHistory, setShowRouteHistory] = useState<boolean>(true);
+    const [autoZoom, setAutoZoom] = useState<boolean>(true);
+    const [showFleetOverview, setShowFleetOverview] = useState<boolean>(true);
+    const [selectedTruck, setSelectedTruck] = useState<TruckLocation | null>(null);
+    const [showVehicleHistory, setShowVehicleHistory] = useState<boolean>(false);
+    const [refreshingGeocoding, setRefreshingGeocoding] = useState<Set<string>>(new Set());
 
     // Update timestamp when locations change
     useEffect(() => {
         if (truckLocations.length > 0) {
             setLastUpdate(new Date());
+            if (!selectedTruck && truckLocations.length > 0) {
+                setSelectedTruck(truckLocations[0]);
+            }
         }
-    }, [truckLocations]);
+    }, [truckLocations, selectedTruck]);
+
+    // Manual refresh of geocoding for a specific truck
+    const refreshGeocoding = async (truckId: string) => {
+        if (refreshingGeocoding.has(truckId)) return;
+
+        setRefreshingGeocoding(prev => new Set(prev).add(truckId));
+
+        const truck = truckLocations.find(t => t.id === truckId);
+        if (!truck) return;
+
+        try {
+            setTruckLocations(prev => prev.map(loc =>
+                loc.id === truckId ? { ...loc, geocodingStatus: 'loading' } : loc
+            ));
+
+            const geocodeResult = await geocodingService.geocode(
+                truck.latitude,
+                truck.longitude
+            );
+
+            setTruckLocations(prev => prev.map(loc =>
+                loc.id === truckId ? {
+                    ...loc,
+                    address: geocodeResult.address,
+                    fullAddress: geocodeResult.fullAddress,
+                    district: geocodeResult.district,
+                    sector: geocodeResult.sector,
+                    geocodingStatus: 'completed'
+                } : loc
+            ));
+
+        } catch (error) {
+            console.warn(`Manual geocoding refresh failed for vehicle ${truckId}:`, error);
+            setTruckLocations(prev => prev.map(loc =>
+                loc.id === truckId ? {
+                    ...loc,
+                    geocodingStatus: 'failed',
+                    address: truck.coordinatesDisplay + ' (Refresh failed)'
+                } : loc
+            ));
+        } finally {
+            setRefreshingGeocoding(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(truckId);
+                return newSet;
+            });
+        }
+    };
 
     // Filter vehicles by status
     const inTransitVehicles = truckLocations.filter(truck => truck.status === 'in_transit');
     const availableVehicles = truckLocations.filter(truck => truck.status === 'available');
     const maintenanceVehicles = truckLocations.filter(truck => truck.status === 'maintenance');
 
-    // Function to manually refresh location for a specific truck
-    const refreshTruckLocation = async (truckId: string) => {
-        if (refreshingTrucks.has(truckId)) return;
-
-        setRefreshingTrucks(prev => new Set(prev).add(truckId));
-
-        try {
-            const truck = truckLocations.find(t => t.id === truckId);
-            if (truck) {
-                const newAddress = await geocodeLocation(truck.latitude, truck.longitude);
-                if (newAddress) {
-                    // Update the specific truck's address
-                    const updatedTrucks = truckLocations.map(t =>
-                        t.id === truckId ? { ...t, address: newAddress } : t
-                    );
-                    // This will trigger a re-render through the parent component
-                }
-            }
-        } catch (error) {
-            console.error(`Failed to refresh location for truck ${truckId}:`, error);
-        } finally {
-            setRefreshingTrucks(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(truckId);
-                return newSet;
-            });
+    // Function to get route coordinates for a vehicle
+    const getRouteCoordinates = (truck: TruckLocation) => {
+        if (!showRouteHistory || !truck.route_coordinates || truck.route_coordinates.length < 2) {
+            return [];
         }
+
+        return truck.route_coordinates.map(coord => [coord.latitude, coord.longitude] as [number, number]);
     };
 
     if (loading) {
@@ -415,12 +627,8 @@ export function EnhancedRealTimeTrackingMap() {
                             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                             <span className="text-sm font-medium text-green-600">Live</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-sm text-slate-500">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                            <span>Auto-refresh: 5s</span>
-                        </div>
                         <div className="text-sm text-slate-500">
-                            Updated {lastUpdate.toLocaleTimeString()}
+                            Updated {formatRwandaTime(lastUpdate)}
                         </div>
                     </div>
                 </div>
@@ -437,12 +645,56 @@ export function EnhancedRealTimeTrackingMap() {
                             >
                                 <option value="standard">🗺️ Street Map</option>
                                 <option value="satellite">🛰️ Satellite</option>
-                                <option value="transit">🚗 Transit</option>
                             </select>
                         </div>
+
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="showRouteHistory"
+                                checked={showRouteHistory}
+                                onChange={(e) => setShowRouteHistory(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <label htmlFor="showRouteHistory" className="flex items-center space-x-1 text-sm text-slate-700">
+                                <Route className="h-4 w-4" />
+                                <span>Show Route</span>
+                            </label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="autoZoom"
+                                checked={autoZoom}
+                                onChange={(e) => setAutoZoom(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <label htmlFor="autoZoom" className="flex items-center space-x-1 text-sm text-slate-700">
+                                <MapPin className="h-4 w-4" />
+                                <span>Auto Zoom</span>
+                            </label>
+                        </div>
+
+                        <button
+                            onClick={() => setShowFleetOverview(!showFleetOverview)}
+                            className="flex items-center space-x-1 text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-lg transition-colors"
+                        >
+                            {showFleetOverview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <span>Fleet Overview</span>
+                        </button>
+
+                        {selectedTruck && (
+                            <button
+                                onClick={() => setShowVehicleHistory(!showVehicleHistory)}
+                                className="flex items-center space-x-1 text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-lg transition-colors"
+                            >
+                                <History className="h-4 w-4" />
+                                <span>Vehicle History</span>
+                            </button>
+                        )}
                     </div>
 
-                    {/* Vehicle Status Summary */}
                     <div className="flex items-center space-x-4 text-sm">
                         <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-lg">
                             <Car className="h-4 w-4 text-blue-600" />
@@ -464,152 +716,214 @@ export function EnhancedRealTimeTrackingMap() {
                 <div className="h-96 lg:h-[500px] relative">
                     <MapContainer
                         center={[-1.9441, 30.0619]} // Kigali, Rwanda
-                        zoom={12}
+                        zoom={13}
                         style={{ height: '100%', width: '100%' }}
                         scrollWheelZoom={true}
                         className="z-0"
                     >
                         <TileLayer
-                            url={tileLayers[mapType].url}
-                            attribution={tileLayers[mapType].attribution}
+                            url={mapType === 'standard'
+                                ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            }
+                            attribution={mapType === 'standard'
+                                ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                : '&copy; <a href="https://www.esri.com/">Esri</a>'
+                            }
                         />
 
-                        <MapUpdater locations={truckLocations} />
+                        <MapUpdater locations={truckLocations} autoZoom={autoZoom && truckLocations.length > 0} />
 
+                        {/* Render route history polylines */}
+                        {truckLocations.map((truck) => {
+                            const routeCoordinates = getRouteCoordinates(truck);
+                            if (routeCoordinates.length > 0) {
+                                return (
+                                    <Polyline
+                                        key={`route-${truck.id}`}
+                                        positions={routeCoordinates}
+                                        color={truck.status === 'in_transit' ? '#3b82f6' :
+                                            truck.status === 'available' ? '#10b981' : '#f59e0b'}
+                                        weight={3}
+                                        opacity={0.6}
+                                    />
+                                );
+                            }
+                            return null;
+                        })}
+
+                        {/* Render truck markers */}
                         {truckLocations.map((truck) => (
                             <Marker
                                 key={truck.id}
                                 position={[truck.latitude, truck.longitude]}
                                 icon={createTruckIcon(truck.status, truck.plate_number, truck.speed)}
+                                eventHandlers={{
+                                    click: () => {
+                                        setSelectedTruck(truck);
+                                        setShowVehicleHistory(true);
+                                    },
+                                }}
                             >
-                                <Popup className="custom-popup min-w-[400px]">
-                                    <div className="p-4">
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <Truck className="h-6 w-6 text-blue-600" />
+                                <Popup className="custom-popup min-w-[320px]">
+                                    <div className="p-3">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center space-x-2">
+                                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <Truck className="h-4 w-4 text-blue-600" />
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-slate-900">{truck.driver_name}</h3>
-                                                    <p className="text-sm text-slate-600">{truck.model} • {truck.plate_number}</p>
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-sm text-slate-900 truncate">{truck.driver_name}</h3>
+                                                    <p className="text-xs text-slate-600 truncate">{truck.model} • {truck.plate_number}</p>
                                                 </div>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${truck.status === 'in_transit'
-                                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                    : truck.status === 'available'
-                                                        ? 'bg-green-100 text-green-800 border border-green-200'
-                                                        : truck.status === 'maintenance'
-                                                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                                            : 'bg-red-100 text-red-800 border border-red-200'
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-semibold flex-shrink-0 ${truck.status === 'in_transit'
+                                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                : truck.status === 'available'
+                                                    ? 'bg-green-100 text-green-800 border border-green-200'
+                                                    : truck.status === 'maintenance'
+                                                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                        : 'bg-red-100 text-red-800 border border-red-200'
                                                 }`}>
                                                 {truck.status.replace('_', ' ').toUpperCase()}
                                             </span>
                                         </div>
 
-                                        <div className="space-y-4">
-                                            {/* Location Information - Prominent Display */}
-                                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 shadow-sm">
-                                                <div className="flex items-start justify-between mb-3">
-                                                    <div className="flex items-center space-x-2">
-                                                        <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                                                        <div>
-                                                            <span className="font-bold text-blue-900 text-sm block">CURRENT LOCATION</span>
-                                                            <div className="flex items-center space-x-1 mt-1">
-                                                                <span className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
-                                                                    📍 {truck.latitude.toFixed(6)}, {truck.longitude.toFixed(6)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+                                        <div className="space-y-3">
+                                            {/* Location Information */}
+                                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center space-x-1">
+                                                        <MapPin className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                                        <span className="font-bold text-blue-900 text-xs">CURRENT LOCATION</span>
                                                     </div>
                                                     <button
-                                                        onClick={() => refreshTruckLocation(truck.id)}
-                                                        disabled={refreshingTrucks.has(truck.id)}
-                                                        className="flex items-center space-x-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            refreshGeocoding(truck.id);
+                                                        }}
+                                                        disabled={refreshingGeocoding.has(truck.id) || truck.geocodingStatus === 'loading'}
+                                                        className="flex items-center space-x-1 text-[10px] bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex-shrink-0"
                                                     >
-                                                        {refreshingTrucks.has(truck.id) ? (
-                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                        {refreshingGeocoding.has(truck.id) || truck.geocodingStatus === 'loading' ? (
+                                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
                                                         ) : (
-                                                            <span>Refresh</span>
+                                                            <RefreshCw className="h-2.5 w-2.5" />
                                                         )}
+                                                        <span>Refresh</span>
                                                     </button>
                                                 </div>
 
-                                                <div className="mt-2">
-                                                    {truck.address ? (
-                                                        <p className="text-blue-800 text-sm leading-relaxed font-medium bg-white/60 p-3 rounded-lg border border-blue-100">
-                                                            {formatAddress(truck.address)}
-                                                        </p>
-                                                    ) : (
-                                                        <div className="flex items-center space-x-3 bg-white/60 p-3 rounded-lg border border-blue-100">
-                                                            <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-                                                            <div>
-                                                                <p className="text-blue-700 text-sm font-medium">Acquiring location information</p>
-                                                                <p className="text-blue-600 text-xs">Auto-refreshing...</p>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center space-x-1">
+                                                        <span className="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-mono">
+                                                            📍 {truck.coordinatesDisplay}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-1">
+                                                        {truck.geocodingStatus === 'loading' ? (
+                                                            <div className="flex items-center space-x-2 bg-white/60 p-2 rounded border border-blue-100">
+                                                                <Loader2 className="h-3 w-3 text-blue-600 animate-spin flex-shrink-0" />
+                                                                <div>
+                                                                    <p className="text-blue-700 text-xs font-medium">Getting address from coordinates...</p>
+                                                                    <p className="text-blue-600 text-[10px] mt-1">
+                                                                        Using LocationIQ & Google Maps APIs
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        ) : truck.address ? (
+                                                            <>
+                                                                <p className="text-blue-800 text-xs leading-tight font-medium bg-white/60 p-2 rounded border border-blue-100">
+                                                                    {truck.address}
+                                                                </p>
+                                                                {truck.fullAddress && truck.fullAddress !== truck.address && (
+                                                                    <p className="text-blue-600 text-[10px] mt-1 italic">
+                                                                        {truck.fullAddress}
+                                                                    </p>
+                                                                )}
+                                                                <p className="text-green-600 text-[10px] mt-1 font-medium">
+                                                                    ✅ Real address from coordinates
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <div className="flex items-center space-x-2 bg-amber-50 p-2 rounded border border-amber-200">
+                                                                <Loader2 className="h-3 w-3 text-amber-600 animate-spin flex-shrink-0" />
+                                                                <div>
+                                                                    <p className="text-amber-700 text-xs font-medium">Acquiring address details...</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            {/* Vehicle & Driver Details */}
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                                <div className="space-y-3">
-                                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                                        <div className="flex items-center space-x-1 mb-2">
-                                                            <Truck className="h-4 w-4 text-slate-600" />
-                                                            <span className="font-semibold text-slate-700">Vehicle ID</span>
+                                            {/* Vehicle Details */}
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="bg-slate-50 p-2 rounded">
+                                                    <div className="flex items-center space-x-1 mb-1">
+                                                        <Truck className="h-3 w-3 text-slate-600" />
+                                                        <span className="font-semibold text-slate-700">Vehicle ID</span>
+                                                    </div>
+                                                    <p className="text-slate-900 font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border truncate">
+                                                        {truck.vehicle_id}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded">
+                                                    <div className="flex items-center space-x-1 mb-1">
+                                                        <User className="h-3 w-3 text-slate-600" />
+                                                        <span className="font-semibold text-slate-700">Driver ID</span>
+                                                    </div>
+                                                    <p className="text-slate-900 font-medium text-xs">{truck.driver_id}</p>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded">
+                                                    <div className="flex items-center space-x-1 mb-1">
+                                                        <Package className="h-3 w-3 text-slate-600" />
+                                                        <span className="font-semibold text-slate-700">Packages</span>
+                                                    </div>
+                                                    <p className="text-slate-900 font-bold text-sm">
+                                                        {truck.assigned_packages?.length || 0}
+                                                    </p>
+                                                </div>
+                                                {truck.speed !== undefined && (
+                                                    <div className="bg-slate-50 p-2 rounded">
+                                                        <div className="flex items-center space-x-1 mb-1">
+                                                            <Navigation className="h-3 w-3 text-slate-600" />
+                                                            <span className="font-semibold text-slate-700">Speed</span>
                                                         </div>
-                                                        <p className="text-slate-900 font-mono text-xs bg-white px-2 py-1 rounded border">
-                                                            {truck.vehicle_id}
+                                                        <p className={`font-bold text-sm ${(truck.speed * 3.6) > 80 ? 'text-red-600' :
+                                                            (truck.speed * 3.6) > 50 ? 'text-amber-600' : 'text-green-600'
+                                                            }`}>
+                                                            {(truck.speed * 3.6).toFixed(1)} km/h
                                                         </p>
                                                     </div>
-                                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                                        <div className="flex items-center space-x-1 mb-2">
-                                                            <User className="h-4 w-4 text-slate-600" />
-                                                            <span className="font-semibold text-slate-700">Driver ID</span>
-                                                        </div>
-                                                        <p className="text-slate-900 font-medium">{truck.driver_id}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                                        <div className="flex items-center space-x-1 mb-2">
-                                                            <Package className="h-4 w-4 text-slate-600" />
-                                                            <span className="font-semibold text-slate-700">Assigned Packages</span>
-                                                        </div>
-                                                        <p className="text-slate-900 font-bold text-lg">
-                                                            {truck.assigned_packages?.length || 0}
-                                                        </p>
-                                                    </div>
-                                                    {truck.speed !== undefined && (
-                                                        <div className="bg-slate-50 p-3 rounded-lg">
-                                                            <div className="flex items-center space-x-1 mb-2">
-                                                                <Navigation className="h-4 w-4 text-slate-600" />
-                                                                <span className="font-semibold text-slate-700">Current Speed</span>
-                                                            </div>
-                                                            <p className={`font-bold text-lg ${(truck.speed * 3.6) > 80 ? 'text-red-600' :
-                                                                    (truck.speed * 3.6) > 50 ? 'text-amber-600' : 'text-green-600'
-                                                                }`}>
-                                                                {(truck.speed * 3.6).toFixed(1)} km/h
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                )}
                                             </div>
 
                                             {/* Last Update */}
-                                            <div className="bg-slate-50 rounded-lg p-3">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center space-x-2">
-                                                        <Clock className="h-4 w-4 text-slate-600" />
-                                                        <span className="font-semibold text-slate-700">Last Position Update</span>
+                                            <div className="bg-slate-50 rounded p-2">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <div className="flex items-center space-x-1">
+                                                        <Clock className="h-3 w-3 text-slate-600" />
+                                                        <span className="font-semibold text-slate-700">Last Update</span>
                                                     </div>
-                                                    <span className="text-slate-900 font-medium">
-                                                        {new Date(truck.last_updated).toLocaleTimeString()}
+                                                    <span className="text-slate-900 font-medium text-xs">
+                                                        {formatRwandaTime(truck.last_updated)}
                                                     </span>
                                                 </div>
                                             </div>
+
+                                            {/* History Button */}
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedTruck(truck);
+                                                    setShowVehicleHistory(true);
+                                                }}
+                                                className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                            >
+                                                <History className="h-4 w-4" />
+                                                <span>View Location History</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </Popup>
@@ -617,45 +931,44 @@ export function EnhancedRealTimeTrackingMap() {
                         ))}
                     </MapContainer>
 
-                    {/* Enhanced Info Panel */}
-                    <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl p-5 min-w-[260px] border border-slate-200">
-                        <div className="flex items-center space-x-2 mb-4">
-                            <Satellite className="h-5 w-5 text-blue-600" />
-                            <h4 className="font-bold text-slate-800 text-lg">Fleet Overview</h4>
+                    {/* Toggleable Fleet Overview Panel */}
+                    <FleetOverviewPanel
+                        isVisible={showFleetOverview}
+                        onToggle={() => setShowFleetOverview(false)}
+                        truckLocations={truckLocations}
+                    />
+
+                    {/* Vehicle History Panel */}
+                    {selectedTruck && (
+                        <VehicleHistoryPanel
+                            vehicle={selectedTruck}
+                            locationHistory={locationHistory}
+                            isExpanded={showVehicleHistory}
+                        />
+                    )}
+
+                    {/* Control indicators */}
+                    <div className="absolute bottom-4 right-4 flex flex-col space-y-1">
+                        <div className="bg-green-500/90 text-white px-2 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm">
+                            🔄 Real-time
                         </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                                <span className="text-sm font-semibold text-slate-700">Total Vehicles</span>
-                                <span className="font-bold text-slate-900 text-xl">{truckLocations.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                    <span className="text-sm text-slate-600">In Transit</span>
-                                </div>
-                                <span className="font-bold text-blue-600 text-lg">{inTransitVehicles.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                    <span className="text-sm text-slate-600">Available</span>
-                                </div>
-                                <span className="font-bold text-green-600 text-lg">{availableVehicles.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-                                    <span className="text-sm text-slate-600">Maintenance</span>
-                                </div>
-                                <span className="font-bold text-amber-600 text-lg">{maintenanceVehicles.length}</span>
-                            </div>
+                        <div className="bg-purple-500/90 text-white px-2 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm flex items-center space-x-1">
+                            <Route className="h-2.5 w-2.5" />
+                            <span>Route: {showRouteHistory ? 'ON' : 'OFF'}</span>
+                        </div>
+                        <div className="bg-blue-500/90 text-white px-2 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm flex items-center space-x-1">
+                            <MapPin className="h-2.5 w-2.5" />
+                            <span>Zoom: {autoZoom ? 'ON' : 'OFF'}</span>
                         </div>
                     </div>
 
-                    {/* Auto-refresh indicator */}
-                    <div className="absolute bottom-4 left-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
-                        🔄 Auto-refresh: 5s
-                    </div>
+                    {/* Geocoding Status */}
+                    {truckLocations.some(truck => truck.geocodingStatus === 'loading') && (
+                        <div className="absolute bottom-4 left-4 bg-blue-500/90 text-white px-3 py-2 rounded-lg text-xs font-medium backdrop-blur-sm flex items-center space-x-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Getting real addresses from coordinates...</span>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>
