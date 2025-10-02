@@ -28,6 +28,40 @@ interface DashboardData {
   activeRoutes: number
 }
 
+interface TruckData {
+  car: {
+    car_id: string
+    plate_number: string
+    model: string
+    car_status: string
+    current_driver_id: string | null
+    driver_id: string | null
+    driver_status: string | null
+    driver_name: string | null
+    driver_phone: string | null
+    branch_name: string | null
+    branch_city: string | null
+  }
+  packages: Array<{
+    package_id: string
+    tracking_number: string
+    receiver_name: string
+    receiver_address: string
+    package_status: string
+    priority: string
+    package_created_at: string
+  }>
+  realTimeLocation: {
+    latitude: number
+    longitude: number
+    accuracy: number
+    heading: number
+    speed: number
+    timestamp: number
+    lastUpdated: string
+  } | null
+}
+
 export function EnhancedDashboard() {
   const { user } = useAuth()
   const [dashboardData, setDashboardData] = useState<DashboardData>({

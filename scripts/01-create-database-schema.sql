@@ -4,7 +4,6 @@
 -- Users table for agents, admin, and receivers
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    user_id VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
@@ -36,7 +35,7 @@ CREATE TABLE IF NOT EXISTS packages (
     special_instructions TEXT,
     status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'cancelled')),
     priority VARCHAR(10) DEFAULT 'normal' CHECK (priority IN ('normal', 'express', 'urgent')),
-    created_by VARCHAR(50) REFERENCES users(user_id),
+    created_by INTEGER REFERENCES users(id),
     picked_up_at TIMESTAMP NULL,
     delivered_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +52,7 @@ CREATE TABLE IF NOT EXISTS tracking (
     status VARCHAR(50) NOT NULL,
     progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
     notes TEXT,
-    updated_by VARCHAR(50) REFERENCES users(user_id),
+    updated_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,7 +65,7 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method VARCHAR(20) DEFAULT 'cash' CHECK (payment_method IN ('cash', 'mobile_money', 'bank_transfer')),
     payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'confirmed', 'failed', 'refunded')),
     transaction_reference VARCHAR(100),
-    confirmed_by VARCHAR(50) REFERENCES users(user_id),
+    confirmed_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     confirmed_at TIMESTAMP NULL
 );
@@ -94,15 +93,14 @@ CREATE INDEX IF NOT EXISTS idx_notifications_package ON notifications(package_id
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 -- Insert default admin user (password: admin123 - should be changed in production)
-INSERT INTO users (user_id, email, password_hash, full_name, phone, role, status) 
+INSERT INTO users (email, password_hash, full_name, phone, role, status) 
 VALUES (
-    'admin001', 
     'admin@kivubelt.com', 
     '$2b$10$rOzJqQZJqQZJqQZJqQZJqOzJqQZJqQZJqQZJqQZJqQZJqQZJqQZJq', 
     'System Administrator', 
     '+250788000000', 
     'admin',
     'active'
-) ON CONFLICT (user_id) DO NOTHING;
+) ON CONFLICT (email) DO NOTHING;
 
 SELECT 'Database schema created successfully!' as message;

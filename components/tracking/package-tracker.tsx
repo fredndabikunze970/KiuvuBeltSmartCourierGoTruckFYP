@@ -2,24 +2,24 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { apiService, type Package, type TrackingEntry } from "@/lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, MapPin, Search, Clock, Truck, CheckCircle, AlertCircle } from "lucide-react"
+import { apiService, type Package, type TrackingEntry } from "@/lib/api"
+import { AlertCircle, CheckCircle, Clock, Loader2, MapPin, Search, Truck } from "lucide-react"
+import { useEffect, useState } from "react"
 import { TrackingMap } from "./tracking-map"
 import { TrackingTimeline } from "./tracking-timeline"
 
 interface PackageTrackerProps {
-  initialPackageId?: string
+  trackingId?: string
 }
 
-export function PackageTracker({ initialPackageId }: PackageTrackerProps) {
-  const [packageId, setPackageId] = useState(initialPackageId || "")
+export function PackageTracker({ trackingId }: PackageTrackerProps) {
+  const [trackingNumber, setTrackingNumber] = useState(trackingId || "")
   const [packageData, setPackageData] = useState<Package | null>(null)
   const [tracking, setTracking] = useState<TrackingEntry[]>([])
   const [currentLocation, setCurrentLocation] = useState<{
@@ -31,14 +31,14 @@ export function PackageTracker({ initialPackageId }: PackageTrackerProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const fetchTrackingData = async (pkgId: string) => {
-    if (!pkgId.trim()) return
+  const fetchTrackingData = async (trackingId: string) => {
+    if (!trackingId.trim()) return
 
     try {
       setLoading(true)
       setError("")
 
-      const response = await apiService.getTracking(pkgId)
+      const response = await apiService.getTracking(trackingId)
       setPackageData(response.package)
       setTracking(response.tracking)
       setCurrentLocation(response.currentLocation || null)
@@ -53,14 +53,14 @@ export function PackageTracker({ initialPackageId }: PackageTrackerProps) {
   }
 
   useEffect(() => {
-    if (initialPackageId) {
-      fetchTrackingData(initialPackageId)
+    if (trackingId) {
+      fetchTrackingData(trackingId)
     }
-  }, [initialPackageId])
+  }, [trackingId])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    fetchTrackingData(packageId)
+    fetchTrackingData(trackingNumber)
   }
 
   const getStatusIcon = (status: string) => {
@@ -118,18 +118,18 @@ export function PackageTracker({ initialPackageId }: PackageTrackerProps) {
         <CardContent>
           <form onSubmit={handleSearch} className="flex gap-4">
             <div className="flex-1">
-              <Label htmlFor="packageId" className="sr-only">
-                Package ID
+              <Label htmlFor="trackingNumber" className="sr-only">
+                Tracking Number
               </Label>
               <Input
-                id="packageId"
-                placeholder="Enter package ID (e.g., PKG-ABC123)"
-                value={packageId}
-                onChange={(e) => setPackageId(e.target.value)}
+                id="trackingNumber"
+                placeholder="Enter tracking number (e.g., PKG-ABC123)"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
                 disabled={loading}
               />
             </div>
-            <Button type="submit" disabled={loading || !packageId.trim()}>
+            <Button type="submit" disabled={loading || !trackingNumber.trim()}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
               Track
             </Button>
@@ -235,7 +235,7 @@ export function PackageTracker({ initialPackageId }: PackageTrackerProps) {
       )}
 
       {/* No Data State */}
-      {!loading && !error && !packageData && packageId && (
+      {!loading && !error && !packageData && trackingNumber && (
         <Card>
           <CardContent className="text-center py-12">
             <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />

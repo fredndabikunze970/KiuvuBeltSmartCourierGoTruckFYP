@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 
 export interface AuthUser {
   id: number
+  user_id: string
   email: string
   role: "admin" | "agent" | "customer"
 }
@@ -12,6 +13,7 @@ export function verifyToken(token: string): AuthUser | null {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     return {
       id: decoded.id,
+      user_id: decoded.user_id,
       email: decoded.email,
       role: decoded.role,
     }

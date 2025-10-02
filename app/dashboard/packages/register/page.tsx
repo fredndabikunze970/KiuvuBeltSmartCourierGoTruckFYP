@@ -4,12 +4,18 @@ import { PackageRegistrationForm } from "@/components/packages/package-registrat
 
 export default function DashboardRegisterPackagePage() {
   return (
-    <ProtectedRoute requiredRole="agent">
-      <DashboardLayout>
+    <DashboardLayout>
+      <ProtectedRoute allowedRoles={["agent", "admin"]}>
         <div className="container mx-auto py-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-2xl font-bold">Register New Package</h1>
+              <p className="text-muted-foreground">Create a new package for delivery</p>
+            </div>
+          </div>
           <PackageRegistrationForm />
         </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+      </ProtectedRoute>
+    </DashboardLayout>
   )
 }

@@ -1,15 +1,14 @@
-import { ProtectedRoute } from "@/components/auth/protected-route"
-import { DashboardLayout } from "@/components/layout/dashboard-layout"
+"use client"
+
 import { UserManagement } from "@/components/admin/user-management"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
 
 export default function UsersPage() {
   return (
-    <ProtectedRoute requiredRole="admin">
-      <DashboardLayout>
-        <div className="container mx-auto py-6">
-          <UserManagement />
-        </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout>
+      <div className="container mx-auto py-6">
+        <UserManagement />
+      </div>
+    </DashboardLayout>
   )
 }

@@ -1,6 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server"
-import bcrypt from "bcryptjs"
 import { sql } from "@/lib/database"
+import bcrypt from "bcryptjs"
+import jwt from "jsonwebtoken"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,15 +24,28 @@ export async function POST(request: NextRequest) {
     const result = await sql`
       INSERT INTO users (email, password_hash, full_name, phone_number, role, status, created_at)
       VALUES (${email}, ${password_hash}, ${full_name}, ${phone_number}, ${role}, 'active', NOW())
-      RETURNING id, email, full_name, phone_number, role
+      RETURNING id, user_id, email, full_name, phone_number, role
     `
 
     const user = result[0]
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        user_id: user.user_id,
+        email: user.email,
+        role: user.role,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
+    )
 
     return NextResponse.json(
       {
         success: true,
         message: "User created successfully",
+        token,
         user: {
           id: user.id,
           email: user.email,

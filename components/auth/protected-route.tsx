@@ -3,32 +3,39 @@
 import type React from "react"
 
 import { useAuth } from "@/hooks/use-auth"
+import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Loader2 } from "lucide-react"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  requiredRole?: "agent" | "admin"
+  allowedRoles?: ("agent" | "admin" | "customer")[]
+  requiredRole?: "agent" | "admin" | "customer" // Keep for backward compatibility
 }
 
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles, requiredRole }: ProtectedRouteProps) {
   const { user, loading, isAuthenticated } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (!loading) {
-      if (!isAuthenticated) {
+      if (!isAuthenticated || !user) {
+        console.log('Not authenticated, redirecting to login');
         router.push("/login")
         return
       }
 
-      if (requiredRole && user?.role !== requiredRole) {
+      // Check if user has the required role or is in allowed roles
+      const hasRequiredRole = !requiredRole || user.role === requiredRole;
+      const hasAllowedRole = !allowedRoles || allowedRoles.includes(user.role);
+      
+      if (!hasRequiredRole && !hasAllowedRole) {
+        console.log('User role:', user.role, 'Required:', requiredRole, 'Allowed:', allowedRoles);
         router.push("/unauthorized")
         return
       }
     }
-  }, [user, loading, isAuthenticated, requiredRole, router])
+  }, [user, loading, isAuthenticated, requiredRole, allowedRoles, router])
 
   if (loading) {
     return (
@@ -45,8 +52,13 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
-    return null
+  // Check if user has the required role or is in allowed roles
+  const hasRequiredRole = !requiredRole || user?.role === requiredRole;
+  const hasAllowedRole = !allowedRoles || allowedRoles.includes(user?.role as any);
+      
+  if (!hasRequiredRole && !hasAllowedRole) {
+    console.log('Access denied - User role:', user?.role, 'Required:', requiredRole, 'Allowed:', allowedRoles);
+    return null;
   }
 
   return <>{children}</>

@@ -1,12 +1,22 @@
-import AfricasTalking from "africastalking"
-import { formatPhoneNumber } from "./utils"
+import { Twilio } from "twilio";
+import { formatPhoneNumber } from "./utils";
 
-const africastalking = AfricasTalking({
-  apiKey: process.env.AFRICAS_TALKING_API_KEY!,
-  username: process.env.AFRICAS_TALKING_USERNAME!,
-})
+// Initialize Twilio client with proper error handling
+let twilioClient: Twilio | null = null;
 
-const sms = africastalking.SMS
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = new Twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    console.log('✅ Twilio client initialized successfully');
+  } else {
+    console.warn('⚠️ Missing Twilio credentials');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Twilio client:', error);
+}
 
 export interface SMSMessage {
   to: string
@@ -25,31 +35,35 @@ export async function sendSMS({ to, message, from }: SMSMessage): Promise<SMSRes
   try {
     const formattedPhone = formatPhoneNumber(to)
 
-    if (process.env.NODE_ENV !== "production" || !process.env.AFRICAS_TALKING_API_KEY) {
-      console.log(`📱 [SMS TEST MODE]`)
-      console.log(`   To: ${formattedPhone}`)
-      console.log(`   From: ${from || process.env.SMS_SENDER_ID || "KIVUBELT"}`)
-      console.log(`   Message: ${message}`)
+    // Check if we have Twilio credentials and client
+    if (!twilioClient || !process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
       return {
-        success: true,
-        messageId: `test-${Date.now()}`,
-        recipients: [{ number: formattedPhone, status: "Success", messageId: `test-${Date.now()}` }],
+        success: false,
+        error: "Twilio is not properly configured",
       }
     }
 
-    const options = {
-      to: [formattedPhone],
-      message,
-      from: from || process.env.SMS_SENDER_ID || "KIVUBELT",
-    }
+    const result = await twilioClient.messages.create({
+      to: formattedPhone,
+      from: from || process.env.TWILIO_PHONE_NUMBER,
+      body: message,
+    })
 
-    const result = await sms.send(options)
-    console.log("📱 SMS sent successfully:", result)
+    // Only log real Twilio response information
+    console.log("📱 Twilio Message Status:", {
+      sid: result.sid,
+      status: result.status,
+      to: result.to,
+      direction: result.direction,
+      dateCreated: result.dateCreated,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage
+    })
 
     return {
       success: true,
-      messageId: result.SMSMessageData?.Recipients?.[0]?.messageId,
-      recipients: result.SMSMessageData?.Recipients,
+      messageId: result.sid,
+      recipients: [{ number: formattedPhone, status: result.status, messageId: result.sid }],
     }
   } catch (error) {
     console.error("❌ SMS sending failed:", error)
@@ -70,16 +84,16 @@ export async function sendPackageNotification(
 
   switch (status) {
     case "registered":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been registered successfully. Track: ${process.env.FRONTEND_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Your package ${trackingNumber} has been registered successfully. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "picked_up":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been picked up and is now in transit. Track: ${process.env.FRONTEND_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Your package ${trackingNumber} has been picked up and is now in transit. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "in_transit":
-      message = `KIVU Belt Express: Your package ${trackingNumber} is in transit${location ? ` at ${location}` : ""}. Track: ${process.env.FRONTEND_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Your package ${trackingNumber} is in transit${location ? ` at ${location}` : ""}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "out_for_delivery":
-      message = `KIVU Belt Express: Your package ${trackingNumber} is out for delivery. Please be available to receive it. Track: ${process.env.FRONTEND_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Your package ${trackingNumber} is out for delivery. Please be available to receive it. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "delivered":
       message = `KIVU Belt Express: Your package ${trackingNumber} has been successfully delivered. Thank you for choosing us!`
@@ -88,7 +102,7 @@ export async function sendPackageNotification(
       message = `KIVU Belt Express: Your package ${trackingNumber} has been cancelled. Contact us for more information.`
       break
     default:
-      message = `KIVU Belt Express: Package ${trackingNumber} status updated to ${status}. Track: ${process.env.FRONTEND_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} status updated to ${status}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
   }
 
   return await sendSMS({
@@ -125,7 +139,7 @@ export const SMS_TEMPLATES = {
 export async function sendTemplatedSMS(
   phoneNumber: string,
   template: keyof typeof SMS_TEMPLATES,
-  ...args: any[]
+  ...args: [string] | [number, string] | [string, string]
 ): Promise<SMSResult> {
   const templateFn = SMS_TEMPLATES[template]
   const message = typeof templateFn === "function" ? templateFn(...args) : templateFn

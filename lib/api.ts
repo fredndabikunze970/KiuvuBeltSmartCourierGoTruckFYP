@@ -17,7 +17,17 @@ interface Package {
   delivery_fee: number
   status: "registered" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "cancelled"
   priority: "normal" | "express" | "urgent"
+  origin_branch_id?: string
+  origin_branch_name?: string
+  destination_branch_id?: string
+  destination_branch_name?: string
+  assigned_car?: string
+  car_plate_number?: string
+  car_model?: string
+  assigned_driver?: string
+  driver_name?: string
   agent_id: string
+  agent_name?: string
   created_at: string
   updated_at: string
   delivered_at?: string
@@ -35,6 +45,43 @@ interface TrackingEntry {
   updated_by: string
   updated_by_name?: string
   created_at: string
+}
+
+interface Branch {
+  id: number
+  branch_id: string
+  branch_name: string
+  latitude: number
+  longitude: number
+  address: string
+  created_at: string
+  updated_at: string
+}
+
+interface Car {
+  id: number
+  car_id: string
+  plate_number: string
+  model: string
+  capacity_kg: number
+  status: "available" | "in-use" | "maintenance"
+  branch_id: string
+  branch_name: string
+  created_at: string
+  updated_at: string
+}
+
+interface Driver {
+  id: number
+  driver_id: string
+  full_name: string
+  phone: string
+  license_number: string
+  assigned_car: string | null
+  branch_id: string
+  branch_name: string
+  created_at: string
+  updated_at: string
 }
 
 interface Payment {
@@ -150,6 +197,135 @@ class ApiService {
     })
   }
 
+  // Branch API methods
+  async getBranches(): Promise<{ branches: Branch[] }> {
+    return this.request('/branches')
+  }
+
+  async getBranch(branchId: string): Promise<{ branch: Branch }> {
+    return this.request(`/branches/${branchId}`)
+  }
+
+  async createBranch(data: {
+    branch_name: string
+    latitude: number
+    longitude: number
+    address: string
+  }): Promise<{ branch: Branch }> {
+    return this.request('/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateBranch(
+    branchId: string,
+    data: {
+      branch_name: string
+      latitude: number
+      longitude: number
+      address: string
+    }
+  ): Promise<{ branch: Branch }> {
+    return this.request(`/branches/${branchId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteBranch(branchId: string): Promise<{ message: string }> {
+    return this.request(`/branches/${branchId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Car API methods
+  async getCars(): Promise<{ cars: Car[] }> {
+    return this.request('/cars')
+  }
+
+  async getCar(carId: string): Promise<{ car: Car }> {
+    return this.request(`/cars/${carId}`)
+  }
+
+  async createCar(data: {
+    plate_number: string
+    model: string
+    capacity_kg: number
+    branch_id: string
+  }): Promise<{ car: Car }> {
+    return this.request('/cars', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateCar(
+    carId: string,
+    data: {
+      plate_number: string
+      model: string
+      capacity_kg: number
+      status: string
+      branch_id: string
+    }
+  ): Promise<{ car: Car }> {
+    return this.request(`/cars/${carId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteCar(carId: string): Promise<{ message: string }> {
+    return this.request(`/cars/${carId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Driver API methods
+  async getDrivers(): Promise<{ drivers: Driver[] }> {
+    return this.request('/drivers')
+  }
+
+  async getDriver(driverId: string): Promise<{ driver: Driver }> {
+    return this.request(`/drivers/${driverId}`)
+  }
+
+  async createDriver(data: {
+    full_name: string
+    phone: string
+    license_number: string
+    assigned_car: string | null
+    branch_id: string
+  }): Promise<{ driver: Driver }> {
+    return this.request('/drivers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateDriver(
+    driverId: string,
+    data: {
+      full_name: string
+      phone: string
+      license_number: string
+      assigned_car: string | null
+      branch_id: string
+    }
+  ): Promise<{ driver: Driver }> {
+    return this.request(`/drivers/${driverId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteDriver(driverId: string): Promise<{ message: string }> {
+    return this.request(`/drivers/${driverId}`, {
+      method: 'DELETE',
+    })
+  }
+
   // Tracking API methods
   async getTracking(packageId: string): Promise<{
     package: Package
@@ -237,4 +413,5 @@ class ApiService {
 }
 
 export const apiService = new ApiService()
-export type { Package, TrackingEntry, Payment }
+export type { Branch, Car, Driver, Package, Payment, TrackingEntry }
+

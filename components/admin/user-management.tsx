@@ -1,13 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { authService } from "@/lib/auth"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { RegisterForm } from "@/components/auth/register-form"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -16,16 +12,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Search, UserPlus, Users, Shield, ShieldCheck } from "lucide-react"
-import { RegisterForm } from "@/components/auth/register-form"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { authService } from "@/lib/auth"
+import { Loader2, Search, Shield, ShieldCheck, UserPlus, Users } from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface User {
-  user_id: string
+  id: string
   email: string
   full_name: string
-  phone: string
+  phone: string | null
   role: "agent" | "admin" | "receiver"
-  is_active: boolean
   created_at: string
 }
 
@@ -40,16 +39,23 @@ export function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/users`, {
-        headers: authService.getAuthHeaders(),
+      const response = await fetch('/api/users', {
+        headers: {
+          ...authService.getAuthHeaders(),
+          'Content-Type': 'application/json'
+        }
       })
 
       if (response.ok) {
         const data = await response.json()
-        setUsers(data.users)
+        setUsers(Array.isArray(data.users) ? data.users : [])
+      } else {
+        console.error("Failed to fetch users:", await response.text())
+        setUsers([])
       }
     } catch (error) {
       console.error("Failed to fetch users:", error)
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -58,7 +64,7 @@ export function UserManagement() {
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/users/${userId}/status`,
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"}/users/${userId}/status`,
         {
           method: "PUT",
           headers: {
@@ -85,12 +91,11 @@ export function UserManagement() {
     const matchesSearch =
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.user_id.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.phone?.toLowerCase() || '').includes(searchTerm.toLowerCase())
 
     const matchesRole = roleFilter === "all" || user.role === roleFilter
-    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? user.is_active : !user.is_active)
 
-    return matchesSearch && matchesRole && matchesStatus
+    return matchesSearch && matchesRole
   })
 
   const formatDate = (dateString: string) => {
@@ -115,11 +120,13 @@ export function UserManagement() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
-        return "bg-red-100 text-red-800"
+        return "bg-purple-50 text-purple-700 border-purple-200 font-semibold"
       case "agent":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-50 text-blue-700 border-blue-200 font-medium"
+      case "receiver":
+        return "bg-green-50 text-green-700 border-green-200"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-50 text-gray-700 border-gray-200"
     }
   }
 
@@ -206,45 +213,91 @@ export function UserManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[40%]">User Information</TableHead>
+                  <TableHead className="w-[15%]">Role</TableHead>
+                  <TableHead className="w-[15%]">Status</TableHead>
+                  <TableHead className="w-[15%]">Created</TableHead>
+                  <TableHead className="w-[15%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user.user_id}>
+                  <TableRow key={user.id} className="hover:bg-muted/50">
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{user.full_name}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{user.user_id}</p>
+                      <div className="flex flex-col space-y-1">
+                        <p className="font-medium text-base">{user.full_name}</p>
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
+                            <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+                          </svg>
+                          <span>{user.email}</span>
+                        </div>
+                        {user.phone && (
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M8 16.25a.75.75 0 01.75-.75h2.5a.75.75 0 010 1.5h-2.5a.75.75 0 01-.75-.75z" />
+                              <path fillRule="evenodd" d="M4 4a3 3 0 013-3h6a3 3 0 013 3v12a3 3 0 01-3 3H7a3 3 0 01-3-3V4zm4-1.5v.75c0 .414.336.75.75.75h2.5a.75.75 0 00.75-.75V2.5h1A1.5 1.5 0 0114.5 4v12a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 16V4A1.5 1.5 0 017 2.5h1z" clipRule="evenodd" />
+                            </svg>
+                            <span>{user.phone}</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge className={getRoleColor(user.role)} variant="secondary">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2 px-1 py-0.5">
                           {getRoleIcon(user.role)}
-                          {user.role}
+                          <span className="capitalize">{user.role}</span>
                         </div>
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.is_active ? "default" : "secondary"}>
-                        {user.is_active ? "Active" : "Inactive"}
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        Active
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(user.created_at)}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleUserStatus(user.user_id, user.is_active)}
-                      >
-                        {user.is_active ? "Deactivate" : "Activate"}
-                      </Button>
+                      <div className="flex flex-col">
+                        <span className="text-sm">{formatDate(user.created_at)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(user.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => fetchUsers()}
+                        >
+                          <svg 
+                            className="h-4 w-4"
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 20 20" 
+                            fill="currentColor"
+                          >
+                            <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
+                          </svg>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
+                          <svg 
+                            className="h-4 w-4" 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 20 20" 
+                            fill="currentColor"
+                          >
+                            <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                            <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                          </svg>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

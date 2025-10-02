@@ -1,0 +1,142 @@
+@keyframes slideUpAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRightAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDownAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideLeftAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slideUpAndFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-right-fade {
+  animation: slideRightAndFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-down-fade {
+  animation: slideDownAndFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-left-fade {
+  animation: slideLeftAndFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-scale {
+  @apply transition-transform duration-200 hover:scale-[1.02];
+}
+
+.hover-elevate {
+  @apply transition-all duration-200 hover:shadow-lg;
+}
+
+.hover-highlight {
+  @apply transition-colors duration-200 hover:bg-accent/50;
+}
+
+/* Card animations */
+.card-enter {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.card-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 300ms ease-in, transform 300ms ease-in;
+}
+
+.card-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.card-exit-active {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+/* Button animations */
+.button-press {
+  @apply active:scale-95 transition-transform duration-200;
+}
+
+/* Gradient backgrounds */
+.bg-gradient-primary {
+  @apply bg-gradient-to-br from-primary to-primary-foreground;
+}
+
+.bg-gradient-secondary {
+  @apply bg-gradient-to-br from-secondary to-secondary-foreground;
+}
+
+/* Glassmorphism */
+.glass {
+  @apply bg-white/10 backdrop-blur-md border border-white/20;
+}
+
+.glass-dark {
+  @apply bg-black/10 backdrop-blur-md border border-black/20;
+}
+
+/* Skeleton loading animation */
+.skeleton {
+  @apply animate-pulse bg-muted rounded;
+}
+
+/* Progress bar animation */
+.progress-bar {
+  @apply relative overflow-hidden;
+}
+
+.progress-bar::after {
+  content: "";
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

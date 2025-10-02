@@ -9,23 +9,43 @@ export interface User {
   updated_at: string
 }
 
+export interface Branch {
+  id: number
+  branch_id: string
+  branch_name: string
+  latitude: number
+  longitude: number
+  address: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Package {
   id: number
-  tracking_number: string
+  package_id: string
+  pickup_code: string
   sender_name: string
   sender_phone: string
   sender_address: string
+  origin_branch_id: string
   receiver_name: string
   receiver_phone: string
   receiver_address: string
-  package_type?: string
+  destination_branch_id: string
+  package_description?: string
   weight?: number
   dimensions?: string
-  description?: string
-  status: "pending" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "cancelled"
-  created_by?: number
+  declared_value?: number
+  delivery_fee: number
+  status: "registered" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "cancelled"
+  priority: "normal" | "express" | "urgent"
+  agent_id: string
   created_at: string
   updated_at: string
+  delivered_at?: string
+  assigned_car?: string
+  assigned_driver?: string
+  delivery_time?: string
 }
 
 export interface TrackingUpdate {

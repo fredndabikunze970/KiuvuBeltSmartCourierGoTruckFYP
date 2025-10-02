@@ -1,3 +1,6 @@
+import jwt from "jsonwebtoken"
+import type { NextRequest } from "next/server"
+
 interface User {
   userId: string
   email: string
@@ -12,8 +15,50 @@ interface AuthResponse {
   message: string
 }
 
+interface AuthUser {
+  id: number
+  user_id: string
+  email: string
+  role: "admin" | "agent" | "customer"
+}
+
+// Server-side auth function for API routes
+export async function auth(request?: NextRequest): Promise<AuthUser | null> {
+  if (!request) {
+    // If no request provided, try to get from headers (for compatibility)
+    const authHeader = (global as any).headers?.get?.("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return null
+    }
+    const token = authHeader.substring(7)
+    return verifyToken(token)
+  }
+
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
+  return verifyToken(token)
+}
+
+function verifyToken(token: string): AuthUser | null {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    return {
+      id: decoded.id,
+      user_id: decoded.user_id,
+      email: decoded.email,
+      role: decoded.role,
+    }
+  } catch (error) {
+    return null
+  }
+}
+
 class AuthService {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api"
   private tokenKey = "kivu_belt_token"
   private userKey = "kivu_belt_user"
 
@@ -103,6 +148,19 @@ class AuthService {
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
+  // Get all localStorage keys and values (for debugging)
+  getAllLocalStorage(): Record<string, string> {
+    if (typeof window === "undefined") return {}
+    const allData: Record<string, string> = {}
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key) {
+        allData[key] = localStorage.getItem(key) || ""
+      }
+    }
+    return allData
+  }
+
   // Refresh token
   async refreshToken(): Promise<string> {
     const token = this.getToken()
@@ -128,4 +186,5 @@ class AuthService {
 }
 
 export const authService = new AuthService()
-export type { User, AuthResponse }
+export type { AuthResponse, User }
+

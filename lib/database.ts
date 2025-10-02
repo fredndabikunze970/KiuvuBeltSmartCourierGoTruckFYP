@@ -7,24 +7,30 @@ if (!process.env.DATABASE_URL) {
 export const sql = neon(process.env.DATABASE_URL)
 
 // Database utility functions
-export async function query(text: string, params?: any[]) {
-  try {
-    const result = await sql(text, params)
-    return result
-  } catch (error) {
-    console.error("Database query error:", error)
-    throw error
-  }
-}
+export const db = {
+  async query(text: string, params?: any[]) {
+    try {
+      if (!params) {
+        // If no params, use tagged template literal
+        return await sql`${text}`
+      }
+      // Use sql.query for parameterized queries
+      return await sql.query(text, params)
+    } catch (error) {
+      console.error("Database query error:", error)
+      throw error
+    }
+  },
 
-// Test database connection
-export async function testConnection() {
-  try {
-    await sql`SELECT 1 as test`
-    console.log("✅ Database connection successful")
-    return true
-  } catch (error) {
-    console.error("❌ Database connection failed:", error)
-    return false
+  // Test database connection
+  async testConnection() {
+    try {
+      await sql`SELECT 1 as test`
+      console.log("✅ Database connection successful")
+      return true
+    } catch (error) {
+      console.error("❌ Database connection failed:", error)
+      return false
+    }
   }
 }

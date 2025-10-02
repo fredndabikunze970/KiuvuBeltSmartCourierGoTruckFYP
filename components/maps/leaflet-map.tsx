@@ -1,8 +1,14 @@
 "use client"
 
-import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
+import dynamic from "next/dynamic"
+import { useEffect, useRef } from "react"
+
+// Create a dynamic version of the LeafletMap component that only loads on the client side
+const DynamicLeafletMap = dynamic(() => Promise.resolve(LeafletMap), {
+  ssr: false, // This will disable server-side rendering for this component
+})
 
 // Fix for default markers in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -62,23 +68,44 @@ export function LeafletMap({ center, zoom = 13, markers = [], className = "" }: 
 
     // Add new markers
     markers.forEach(({ position, popup, isActive }) => {
-      const marker = L.marker(position)
+      const customIcon = L.divIcon({
+        className: `custom-marker ${isActive ? "active pulse" : ""}`,
+        html: `<div class="marker-inner">
+          <div class="marker-pin"></div>
+          ${isActive ? '<div class="marker-pulse"></div>' : ''}
+        </div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+      })
 
-      if (isActive) {
-        // Create custom active marker
-        const customIcon = L.divIcon({
-          className: "custom-marker active",
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        })
-        marker.setIcon(customIcon)
-      }
+      const marker = L.marker(position, { icon: customIcon })
 
       if (popup) {
-        marker.bindPopup(popup)
+        marker.bindPopup(
+          `<div class="custom-popup">
+            <div class="popup-content">
+              ${popup}
+            </div>
+          </div>`,
+          {
+            className: 'custom-popup-wrapper',
+            closeButton: true,
+          }
+        )
       }
 
+      // Add marker with animation
       marker.addTo(map)
+      const element = marker.getElement()
+      if (element) {
+        element.style.opacity = '0'
+        element.style.transform = 'translateY(-20px)'
+        setTimeout(() => {
+          element.style.transition = 'all 0.3s ease-out'
+          element.style.opacity = '1'
+          element.style.transform = 'translateY(0)'
+        }, 100)
+      }
     })
   }, [markers])
 

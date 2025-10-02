@@ -1,8 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { getAuthUser, requireAuth, type AuthUser } from "@/lib/auth-middleware"
 import { sql } from "@/lib/database"
-import { getAuthUser } from "@/lib/auth-middleware"
-import { generateTrackingNumber } from "@/lib/utils"
 import { sendPackageNotification } from "@/lib/sms"
+import { generateTrackingNumber } from "@/lib/utils"
+import { packageFormSchema } from "@/lib/validations/package"
+import { NextResponse, type NextRequest } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,78 +23,166 @@ export async function GET(request: NextRequest) {
     if (user.role === "admin") {
       if (status && search) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.status = ${status} 
-          AND (p.tracking_number ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else if (status) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.status = ${status}
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else if (search) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
-          WHERE (p.tracking_number ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
+          WHERE (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       }
     } else {
-      // For non-admin users, filter by created_by
+      // For non-admin users, filter by agent_id
       if (status && search) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
-          WHERE p.created_by = ${user.id} AND p.status = ${status} 
-          AND (p.tracking_number ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
+          WHERE p.agent_id = ${user.user_id} AND p.status = ${status} 
+          AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else if (status) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
-          WHERE p.created_by = ${user.id} AND p.status = ${status}
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
+          WHERE p.agent_id = ${user.user_id} AND p.status = ${status}
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else if (search) {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
-          WHERE p.created_by = ${user.id} 
-          AND (p.tracking_number ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
+          WHERE p.agent_id = ${user.user_id} 
+          AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       } else {
         packages = await sql`
-          SELECT p.*, u.full_name as created_by_name 
+          SELECT 
+            p.*,
+            u.full_name as agent_name,
+            ob.branch_name as origin_branch_name,
+            db.branch_name as destination_branch_name,
+            c.plate_number as car_plate_number,
+            c.model as car_model,
+            d.full_name as driver_name
           FROM packages p 
-          LEFT JOIN users u ON p.created_by = u.id 
-          WHERE p.created_by = ${user.id}
+          LEFT JOIN users u ON p.agent_id = u.user_id 
+          LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
+          LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
+          LEFT JOIN cars c ON p.assigned_car = c.car_id
+          LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
+          WHERE p.agent_id = ${user.user_id}
           ORDER BY p.created_at DESC 
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -104,7 +193,7 @@ export async function GET(request: NextRequest) {
     const totalResult =
       user.role === "admin"
         ? await sql`SELECT COUNT(*) FROM packages`
-        : await sql`SELECT COUNT(*) FROM packages WHERE created_by = ${user.id}`
+        : await sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id}`
 
     const total = Number(totalResult[0].count)
 
@@ -124,38 +213,75 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = requireAuth(async (request: NextRequest, user: AuthUser) => {
   try {
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Only admin and agents can register packages
+    if (user.role !== 'admin' && user.role !== 'agent') {
+      return NextResponse.json(
+        { error: "Only admins and agents can register packages" },
+        { status: 403 }
+      )
     }
 
     const packageData = await request.json()
+    
+    // Validate input data against our schema
+    const validationResult = packageFormSchema.safeParse({
+      senderName: packageData.sender_name,
+      senderPhone: packageData.sender_phone,
+      senderAddress: packageData.sender_address,
+      originBranchId: packageData.origin_branch_id,
+      receiverName: packageData.receiver_name,
+      receiverPhone: packageData.receiver_phone,
+      receiverAddress: packageData.receiver_address,
+      destinationBranchId: packageData.destination_branch_id,
+      packageDescription: packageData.description,
+      weight: packageData.weight?.toString(),
+      dimensions: packageData.dimensions,
+      deliveryFee: packageData.delivery_fee?.toString(),
+      priority: packageData.priority || 'normal'
+    })
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Invalid input data", details: validationResult.error.errors },
+        { status: 400 }
+      )
+    }
+
     const {
-      sender_name,
-      sender_phone,
-      sender_address,
-      receiver_name,
-      receiver_phone,
-      receiver_address,
-      package_type,
+      senderName: sender_name,
+      senderPhone: sender_phone,
+      senderAddress: sender_address,
+      originBranchId: origin_branch_id,
+      receiverName: receiver_name,
+      receiverPhone: receiver_phone,
+      receiverAddress: receiver_address,
+      destinationBranchId: destination_branch_id,
+      packageDescription: description,
       weight,
       dimensions,
-      description,
-    } = packageData
+      deliveryFee: delivery_fee,
+      priority
+    } = validationResult.data
+
+    const { assigned_car, assigned_driver } = packageData
 
     const tracking_number = generateTrackingNumber()
 
     const result = await sql`
       INSERT INTO packages (
-        tracking_number, sender_name, sender_phone, sender_address,
+        package_id, pickup_code, sender_name, sender_phone, sender_address,
         receiver_name, receiver_phone, receiver_address,
-        package_type, weight, dimensions, description, status, created_by, created_at
+        package_description, weight, dimensions, delivery_fee, status,
+        priority, origin_branch_id, destination_branch_id,
+        assigned_car, assigned_driver, agent_id, created_at
       ) VALUES (
-        ${tracking_number}, ${sender_name}, ${sender_phone}, ${sender_address},
+        ${tracking_number}, ${generateTrackingNumber()}, ${sender_name}, ${sender_phone}, ${sender_address},
         ${receiver_name}, ${receiver_phone}, ${receiver_address},
-        ${package_type}, ${weight}, ${dimensions}, ${description}, 'pending', ${user.id}, NOW()
+        ${description}, ${weight}, ${dimensions}, ${delivery_fee}, 'registered',
+        ${priority}, ${origin_branch_id}, ${destination_branch_id}, 
+        ${assigned_car}, ${assigned_driver}, ${user.user_id}, NOW()
       )
       RETURNING *
     `
@@ -186,4 +312,4 @@ export async function POST(request: NextRequest) {
     console.error("Create package error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+})
