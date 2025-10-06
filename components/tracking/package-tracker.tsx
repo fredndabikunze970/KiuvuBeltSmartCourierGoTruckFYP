@@ -39,6 +39,13 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
       setError("")
 
       const response = await apiService.getTracking(trackingId)
+      if (response.package?.status !== "in_transit") {
+        setError("Package not yet packed in car")
+        setPackageData(null)
+        setTracking([])
+        setCurrentLocation(null)
+        return
+      }
       setPackageData(response.package)
       setTracking(response.tracking)
       setCurrentLocation(response.currentLocation || null)

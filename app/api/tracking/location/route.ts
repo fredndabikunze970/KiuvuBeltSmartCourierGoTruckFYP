@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { updatePackageLocation } from "@/lib/firebase"
+import { updatePackageLocation, getPackageLocation } from "@/lib/firebase"
 import { requireAuth } from "@/lib/auth-middleware"
 
 export const POST = requireAuth(async (request: NextRequest, user) => {
@@ -46,18 +46,11 @@ export const GET = requireAuth(async (request: NextRequest) => {
       return NextResponse.json({ error: "Tracking number is required" }, { status: 400 })
     }
 
-    // Get location from Firebase (this would be implemented with actual Firebase call)
-    const mockLocation = {
-      latitude: -1.9441,
-      longitude: 30.0619,
-      address: "Kigali, Rwanda",
-      timestamp: Date.now(),
-      lastUpdated: new Date().toISOString(),
-    }
+    const location = await getPackageLocation(trackingNumber)
 
     return NextResponse.json({
       success: true,
-      location: mockLocation,
+      location,
     })
   } catch (error) {
     console.error("Get location error:", error)

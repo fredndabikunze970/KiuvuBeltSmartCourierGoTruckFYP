@@ -1,4 +1,5 @@
 import { PackageTracker } from '@/components/tracking/package-tracker';
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
 interface TrackingPageParams {
   params: {
@@ -10,8 +11,10 @@ export default function TrackingPage({ params }: TrackingPageParams) {
   const { trackingId } = params;
 
   return (
-    <div className="container mx-auto p-4">
-      <PackageTracker trackingId={trackingId} />
-    </div>
+    <DashboardLayout>
+      <div className="container mx-auto p-4">
+        <PackageTracker trackingId={trackingId} />
+      </div>
+    </DashboardLayout>
   );
 }

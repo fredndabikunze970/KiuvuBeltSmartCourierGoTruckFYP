@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless"
+import { neon } from "@neondatabase/serverless";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set")
@@ -8,14 +8,14 @@ export const sql = neon(process.env.DATABASE_URL)
 
 // Database utility functions
 export const db = {
-  async query(text: string, params?: any[]) {
+  async query(query: string | { text: string; values: any[] }) {
     try {
-      if (!params) {
-        // If no params, use tagged template literal
-        return await sql`${text}`
+      if (typeof query === 'string') {
+        // If string query, use tagged template literal
+        return await sql`${query}`
       }
       // Use sql.query for parameterized queries
-      return await sql.query(text, params)
+      return await sql.query(query.text, query.values)
     } catch (error) {
       console.error("Database query error:", error)
       throw error

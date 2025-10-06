@@ -37,36 +37,43 @@ export function RealTimeTracker({ trackingNumber, packageData }: RealTimeTracker
   const mapRef = useRef<any>(null)
 
   useEffect(() => {
-    // Subscribe to Firebase real-time updates
-    const unsubscribe = subscribeToLocationUpdates()
+    // Subscribe to Firebase real-time updates using client SDK
+    let unsub: (() => void) | undefined
+    const setup = async () => {
+      try {
+        const { db } = await import("@/lib/firebase-client")
+        const { ref, onValue, off } = await import("firebase/database")
+        const r = ref(db, `tracking/${trackingNumber}`)
+        const handler = (snapshot: any) => {
+          const data = snapshot.val() as any
+          if (data) {
+            const loc: LocationData = {
+              latitude: data.latitude,
+              longitude: data.longitude,
+              address: data.address,
+              timestamp: data.timestamp || Date.now(),
+              lastUpdated: data.lastUpdated || new Date().toISOString(),
+              speed: data.speed,
+              accuracy: data.accuracy,
+            }
+            setCurrentLocation(loc)
+            setLocationHistory((prev) => [...prev.slice(-20), loc])
+          }
+        }
+        onValue(r, handler)
+        unsub = () => off(r, "value", handler)
+      } catch (e) {
+        console.error("Failed to subscribe to Firebase:", e)
+      }
+    }
+    setup()
     return () => {
-      if (unsubscribe) unsubscribe()
+      if (unsub) unsub()
       stopTracking()
     }
   }, [trackingNumber])
 
-  const subscribeToLocationUpdates = () => {
-    // Simulate Firebase real-time subscription
-    const interval = setInterval(() => {
-      if (isTracking) {
-        // Simulate receiving location updates from Firebase
-        const mockLocation: LocationData = {
-          latitude: -1.9441 + (Math.random() - 0.5) * 0.01,
-          longitude: 30.0619 + (Math.random() - 0.5) * 0.01,
-          address: "Kigali, Rwanda",
-          timestamp: Date.now(),
-          lastUpdated: new Date().toISOString(),
-          speed: Math.random() * 60,
-          accuracy: Math.random() * 10 + 5,
-        }
-
-        setCurrentLocation(mockLocation)
-        setLocationHistory((prev) => [...prev.slice(-20), mockLocation]) // Keep last 20 locations
-      }
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }
+  // Removed simulated subscription
 
   const startTracking = () => {
     if (!navigator.geolocation) {
