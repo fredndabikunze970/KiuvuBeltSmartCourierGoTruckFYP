@@ -1,7 +1,28 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 import { formatPhoneNumber } from "@/lib/utils"
+import { type NextRequest, NextResponse } from "next/server"
+
+// Force dynamic behavior for fresh tracking data
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+
+// Normalize mixed timestamp formats (seconds, ms, numeric string, ISO)
+function normalizeTs(raw: any): number {
+  if (raw == null) return Date.now()
+  if (typeof raw === 'number') return raw < 1e12 ? raw * 1000 : raw
+  if (typeof raw === 'string') {
+    if (/^\d+$/.test(raw)) {
+      const n = parseInt(raw, 10)
+      return n < 1e12 ? n * 1000 : n
+    }
+    const d = Date.parse(raw)
+    return isNaN(d) ? Date.now() : d
+  }
+  return Date.now()
+}
 
 export async function GET(request: NextRequest, { params }: { params: { trackingNumber: string } }) {
     try {
@@ -171,133 +192,190 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
 
         try {
             const { database } = await import("@/lib/firebase")
-            const locationRef = database.ref(`location_history/${vehicleId}`)
+            const locationRef = database.ref(`vehicles/${vehicleId}/current_location`)
 
-            // Get last 4 location entries for history
-            const snapshot = await locationRef.limitToLast(4).once("value")
+            // Get current location data
+            const snapshot = await locationRef.once("value")
             const locationData = snapshot.val()
 
             if (locationData) {
-                const keys = Object.keys(locationData)
-                const allLocations = keys.map(key => ({
-                    ...locationData[key],
-                    key: key
-                })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                console.log('📡 Raw Firebase current_location data:', locationData)
 
-                // Get the latest location
-                const latestLocation = allLocations[0]
+                // Handle the data structure - it might be a single object or have nested properties
+                let latitude = locationData.latitude
+                let longitude = locationData.longitude
+                let timestamp = locationData.timestamp || locationData.time || locationData.created_at
+                let accuracy = locationData.accuracy
+                let heading = locationData.heading
+                let speed = locationData.speed
+                let battery_level = locationData.battery_level
+                let device_status = locationData.device_status
+                let signal_strength = locationData.signal_strength
 
-                // Validate and fix timestamp (Firebase might store in seconds, not milliseconds)
-                let timestamp = latestLocation.timestamp || Date.now()
-
-                // If timestamp is too small (less than year 2000), it's probably in seconds
-                if (timestamp < 946684800000) { // Jan 1, 2000 in milliseconds
-                    timestamp = timestamp * 1000 // Convert seconds to milliseconds
-                    console.log("🕐 Converting timestamp from seconds to milliseconds:", {
-                        original: latestLocation.timestamp,
-                        converted: timestamp
-                    })
-                }
-
-                const timestampDate = new Date(timestamp)
-                const isValidDate = !isNaN(timestampDate.getTime())
-
-                // Reverse geocode current location using LocationIQ
-                let address = null
-                if (apiKey) {
-                    try {
-                        const geocodeUrl = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${latestLocation.latitude}&lon=${latestLocation.longitude}&format=json`
-
-                        console.log("🔍 Geocoding location:", {
-                            lat: latestLocation.latitude,
-                            lon: latestLocation.longitude
-                        })
-
-                        const geocodeResponse = await fetch(geocodeUrl)
-
-                        if (!geocodeResponse.ok) {
-                            const errorText = await geocodeResponse.text()
-                            console.error("❌ Geocoding error response:", geocodeResponse.status, errorText)
-                        } else {
-                            const geocodeData = await geocodeResponse.json()
-                            console.log("📦 Geocoding Response:", JSON.stringify(geocodeData, null, 2))
-                            address = geocodeData.display_name || null
-                            console.log("✅ Geocoded address:", address)
+                // If latitude/longitude are not direct properties, try to extract from nested structure
+                if (latitude === undefined && longitude === undefined) {
+                    // Check if it's stored as separate properties
+                    if (typeof locationData === 'object') {
+                        const keys = Object.keys(locationData)
+                        for (const key of keys) {
+                            if (key === 'latitude' || key === 'longitude' || key === 'timestamp' || key === 'accuracy' || key === 'speed' || key === 'heading' || key === 'battery_level' || key === 'device_status' || key === 'signal_strength') {
+                                if (key === 'latitude') latitude = locationData[key]
+                                if (key === 'longitude') longitude = locationData[key]
+                                if (key === 'timestamp') timestamp = locationData[key]
+                                if (key === 'accuracy') accuracy = locationData[key]
+                                if (key === 'speed') speed = locationData[key]
+                                if (key === 'heading') heading = locationData[key]
+                                if (key === 'battery_level') battery_level = locationData[key]
+                                if (key === 'device_status') device_status = locationData[key]
+                                if (key === 'signal_strength') signal_strength = locationData[key]
+                            }
                         }
-                    } catch (error) {
-                        console.error("❌ Geocoding error:", error)
                     }
                 }
 
-                realTimeLocation = {
-                    latitude: latestLocation.latitude,
-                    longitude: latestLocation.longitude,
-                    accuracy: latestLocation.accuracy,
-                    heading: latestLocation.heading,
-                    speed: latestLocation.speed,
-                    timestamp: timestamp,
-                    lastUpdated: isValidDate ? timestampDate.toISOString() : new Date().toISOString(),
-                    vehicleId: vehicleId,
-                    address: address,
-                }
+                console.log('🛰️ Extracted location data:', {
+                    vehicleId,
+                    latitude,
+                    longitude,
+                    timestamp,
+                    accuracy,
+                    speed,
+                    battery_level,
+                    device_status,
+                    signal_strength
+                })
 
-                // Prepare location history (last 4 points) with geocoding
-                const geocodePromises = allLocations.map(async (loc, idx) => {
-                    let ts = loc.timestamp || Date.now()
+                if (latitude !== undefined && longitude !== undefined) {
+                    const ts = normalizeTs(timestamp)
+                    console.log('✅ Valid location found:', { vehicleId, lat: latitude, lng: longitude, ts })
 
-                    // Fix timestamp if in seconds
-                    if (ts < 946684800000) {
-                        ts = ts * 1000
-                    }
+                    // Use the current location data directly
+                    let chosenLat = latitude
+                    let chosenLng = longitude
+                    let chosenTs = ts
+                    let chosenAccuracy = accuracy
+                    let chosenHeading = heading
+                    let chosenSpeed = speed
+                    let chosenBatteryLevel = battery_level
+                    let chosenDeviceStatus = device_status
+                    let chosenSignalStrength = signal_strength
 
-                    const tsDate = new Date(ts)
+                    const timestampDate = new Date(chosenTs)
+                    const isValidDate = !isNaN(timestampDate.getTime())
 
-                    // Geocode this location
-                    let locationAddress = null
-                    if (apiKey && loc.latitude && loc.longitude) {
+                    // Reverse geocode chosen latest coordinate
+                    let address = null
+                    if (apiKey) {
                         try {
-                            const geocodeUrl = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${loc.latitude}&lon=${loc.longitude}&format=json`
+                            const geocodeUrl = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${chosenLat}&lon=${chosenLng}&format=json`
+
+                            console.log("🔍 Geocoding location:", {
+                                lat: chosenLat,
+                                lon: chosenLng
+                            })
+
                             const geocodeResponse = await fetch(geocodeUrl)
 
-                            if (geocodeResponse.ok) {
+                            if (!geocodeResponse.ok) {
+                                const errorText = await geocodeResponse.text()
+                                console.error("❌ Geocoding error response:", geocodeResponse.status, errorText)
+                            } else {
                                 const geocodeData = await geocodeResponse.json()
-                                locationAddress = geocodeData.display_name || null
-                                console.log(`📍 Geocoded history[${idx}]: ${locationAddress}`)
+                                console.log("📦 Geocoding Response:", JSON.stringify(geocodeData, null, 2))
+                                address = geocodeData.display_name || null
+                                console.log("✅ Geocoded address:", address)
                             }
                         } catch (error) {
-                            console.error(`❌ Error geocoding history[${idx}]:`, error)
+                            console.error("❌ Geocoding error:", error)
                         }
                     }
 
-                    return {
-                        latitude: loc.latitude,
-                        longitude: loc.longitude,
-                        timestamp: ts,
-                        lastUpdated: !isNaN(tsDate.getTime()) ? tsDate.toISOString() : new Date().toISOString(),
-                        accuracy: loc.accuracy,
-                        speed: loc.speed,
-                        heading: loc.heading,
-                        address: locationAddress,
+                    realTimeLocation = {
+                        latitude: chosenLat,
+                        longitude: chosenLng,
+                        accuracy: chosenAccuracy,
+                        heading: chosenHeading,
+                        speed: chosenSpeed,
+                        battery_level: chosenBatteryLevel,
+                        device_status: chosenDeviceStatus,
+                        signal_strength: chosenSignalStrength,
+                        timestamp: chosenTs,
+                        lastUpdated: isValidDate ? timestampDate.toISOString() : new Date().toISOString(),
+                        vehicleId: vehicleId,
+                        address: address,
                     }
-                })
 
-                // Wait for all geocoding to complete
-                locationHistory = await Promise.all(geocodePromises)
+                    // For now, just use the current location as the single history point
+                    // TODO: Implement proper history fetching from Firebase
+                    locationHistory = [{
+                        latitude: chosenLat,
+                        longitude: chosenLng,
+                        timestamp: chosenTs,
+                        lastUpdated: timestampDate.toISOString(),
+                        accuracy: chosenAccuracy,
+                        speed: chosenSpeed,
+                        heading: chosenHeading,
+                        battery_level: chosenBatteryLevel,
+                        device_status: chosenDeviceStatus,
+                        signal_strength: chosenSignalStrength,
+                        address: address,
+                    }]
 
-                console.log("📊 Location history prepared:", {
-                    count: locationHistory.length,
-                    latest: locationHistory[0]?.lastUpdated,
-                    oldest: locationHistory[locationHistory.length - 1]?.lastUpdated
-                })
+                    console.log("📊 Location history prepared:", {
+                        count: locationHistory.length,
+                        latest: locationHistory[0]?.lastUpdated
+                    })
 
-                console.log("✅ Real-time location found:", {
-                    lat: realTimeLocation.latitude,
-                    lon: realTimeLocation.longitude,
-                    vehicleId,
-                    address,
-                    historyCount: locationHistory.length,
-                    lastUpdated: realTimeLocation.lastUpdated
-                })
+                    console.log("✅ Real-time location found:", {
+                        lat: realTimeLocation.latitude,
+                        lon: realTimeLocation.longitude,
+                        vehicleId,
+                        address,
+                        historyCount: locationHistory.length,
+                        lastUpdated: realTimeLocation.lastUpdated
+                    })
+                }
+            } else {
+                // Fallback to current_location if history is empty
+                try {
+                    const currentRef = database.ref(`vehicles/${vehicleId}/current_location`)
+                    const currentSnap = await currentRef.once('value')
+                    const v = currentSnap.val()
+                    if (v && typeof v.latitude === 'number' && typeof v.longitude === 'number') {
+                        const ts = normalizeTs(v.timestamp ?? v.last_updated ?? v.time)
+                        let address = null
+                        if (apiKey) {
+                            try {
+                                const geocodeUrl = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${v.latitude}&lon=${v.longitude}&format=json`
+                                const geocodeResponse = await fetch(geocodeUrl)
+                                if (geocodeResponse.ok) {
+                                    const geocodeData = await geocodeResponse.json()
+                                    address = geocodeData.display_name || null
+                                }
+                            } catch {}
+                        }
+
+                        realTimeLocation = {
+                            latitude: v.latitude,
+                            longitude: v.longitude,
+                            accuracy: v.accuracy,
+                            heading: v.heading,
+                            speed: v.speed,
+                            battery_level: v.battery_level,
+                            device_status: v.device_status,
+                            signal_strength: v.signal_strength,
+                            timestamp: ts,
+                            lastUpdated: new Date(ts).toISOString(),
+                            vehicleId,
+                            address
+                        }
+
+                        locationHistory = []
+                        console.log('✅ Fallback current_location used for latest position', { vehicleId, lat: v.latitude, lng: v.longitude, ts })
+                    }
+                } catch (err) {
+                    console.warn('Fallback to current_location failed:', err)
+                }
             }
         } catch (error) {
             console.log("❌ No real-time location available:", error)
@@ -455,7 +533,7 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
 
                     // Record that notification was sent
                     await sql`
-                        INSERT INTO tracking (package_id, status, location, notes, created_at)
+                        INSERT INTO tracking (package_id, status, location_name, notes, created_at)
                         VALUES (${packageData.package_id}, ${`progress_${milestone}_sent`}, 'System', 'Progress milestone SMS sent', NOW())
                     `
                     console.log(`✅ Recorded ${milestone}% progress notification sent`)
@@ -468,7 +546,8 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
             hasCurrentLocation: !!realTimeLocation,
             progress: `${progress.toFixed(1)}%`,
             distanceTraveled: `${(distanceTraveled / 1000).toFixed(2)} km`,
-            distanceRemaining: `${(distanceRemaining / 1000).toFixed(2)} km`
+            distanceRemaining: `${(distanceRemaining / 1000).toFixed(2)} km`,
+            currentLocation: realTimeLocation
         })
 
         return NextResponse.json({
@@ -491,7 +570,7 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
             paymentStatus,
             paymentConfirmed,
             allowTrackingWithoutPayment,
-        })
+        }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (error) {
         console.error("Tracking error:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })

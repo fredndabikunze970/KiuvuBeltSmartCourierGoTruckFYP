@@ -17,6 +17,37 @@ import { db } from "@/lib/firebase-client"
 import { ref, onValue, off } from "firebase/database"
 import { geocodingService } from "@/utils/geocoding-services"
 
+// Normalize timestamps coming from RTDB (seconds, ms, or ISO strings)
+function normalizeTimestamp(ts: any): number {
+    try {
+        if (ts == null) return Date.now()
+        if (typeof ts === 'number') {
+            // If in seconds, convert to ms
+            return ts < 1e12 ? ts * 1000 : ts
+        }
+        if (typeof ts === 'string') {
+            // Numeric string
+            if (/^\d+$/.test(ts)) {
+                const n = parseInt(ts, 10)
+                return n < 1e12 ? n * 1000 : n
+            }
+            // ISO date string
+            const d = Date.parse(ts)
+            return isNaN(d) ? Date.now() : d
+        }
+        return Date.now()
+    } catch {
+        return Date.now()
+    }
+}
+
+// Plausible timestamp guard: discard dates before 2000 and far future (> now + 1 day)
+function isPlausibleTimestamp(ts: number): boolean {
+    const min = new Date('2000-01-01T00:00:00Z').getTime()
+    const max = Date.now() + 24 * 60 * 60 * 1000
+    return Number.isFinite(ts) && ts >= min && ts <= max
+}
+
 interface PackageTrackerProps {
     trackingId?: string
 }
@@ -32,6 +63,12 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
         lastUpdated: string
         vehicleId?: string
         address?: string
+        accuracy?: number
+        heading?: number
+        speed?: number
+        battery_level?: number
+        device_status?: string
+        signal_strength?: number
     } | null>(null)
     const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
     const [progress, setProgress] = useState<number>(0)
@@ -81,75 +118,213 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
         }
     }, [trackingId])
 
-    // Real-time Firebase location updates (single live subscription, no polling)
+    // Real-time Firebase location updates (subscribe to both current_location and history)
     useEffect(() => {
         const activeStatuses = ["in_transit", "out_for_delivery"]
         if (!packageData || !activeStatuses.includes(packageData.status)) return
 
-        const vehicleId = currentLocation?.vehicleId || packageData.assigned_car || 'CAR001'
-        const locationRef = ref(db, `location_history/${vehicleId}`)
+        // Force a single vehicle for tracking (prefer env, default to CAR001)
+        const forcedVehicleId = process.env.NEXT_PUBLIC_FORCE_VEHICLE_ID || 'CAR001'
+        const vehicleId = forcedVehicleId
+        console.log('🔧 Forced vehicleId for tracking:', vehicleId)
+
+        const historyRef = ref(db, `location_history/${vehicleId}`)
+        const currentRef = ref(db, `vehicles/${vehicleId}/current_location`)
+        const packageRef = ref(db, `tracking/${packageData.package_id}`)
 
         console.log("🔥 Setting up Firebase real-time updates for vehicle:", vehicleId)
 
-        const unsubscribe = onValue(locationRef, async (snapshot) => {
-            const data = snapshot.val()
-            if (!data) return
-
-            const allLocations = Object.keys(data).map(key => ({ ...data[key], key })).sort(
-                (a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)
-            )
-            const latestLocation = allLocations[0]
-            const timestamp = latestLocation.timestamp || Date.now()
-
-            // Geocode current location (best-effort)
-            let currentAddress: string | undefined = undefined
+        // Update helper
+        const setLatestLocation = async (lat: number, lng: number, rawTs?: any, additionalData?: any) => {
+            const ts = normalizeTimestamp(rawTs)
+            console.log('🔄 RTDB normalized', { vehicleId, lat, lng, rawTs, ts })
+            let address: string | undefined = undefined
             try {
-                const geocodingResult = await geocodingService.geocode(latestLocation.latitude, latestLocation.longitude)
-                currentAddress = geocodingResult.address
+                const geocodingResult = await geocodingService.geocode(lat, lng)
+                address = geocodingResult.address
             } catch (error) {
-                console.warn("Geocoding current location failed:", error)
+                // best-effort
+                console.warn('⚠️ reverse geocode failed', { vehicleId, lat, lng, error })
             }
-
-            setCurrentLocation({
-                latitude: latestLocation.latitude,
-                longitude: latestLocation.longitude,
-                timestamp,
-                lastUpdated: new Date(timestamp).toISOString(),
+            console.log('📍 setCurrentLocation()', {
                 vehicleId,
-                address: currentAddress,
+                location: { lat, lng },
+                ts,
+                lastUpdated: new Date(ts).toISOString(),
+                hasAddress: !!address,
             })
+            setCurrentLocation({
+                latitude: lat,
+                longitude: lng,
+                timestamp: ts,
+                lastUpdated: new Date(ts).toISOString(),
+                vehicleId,
+                address,
+                accuracy: additionalData?.accuracy,
+                heading: additionalData?.heading,
+                speed: additionalData?.speed,
+                battery_level: additionalData?.battery_level,
+                device_status: additionalData?.device_status,
+                signal_strength: additionalData?.signal_strength,
+            })
+        }
 
-            // Keep a recent trail for the side panel and polyline
-            const geocodePromises = allLocations.slice(0, 4).map(async (loc: any) => {
-                try {
-                    const geocodingResult = await geocodingService.geocode(loc.latitude, loc.longitude)
-                    return {
-                        latitude: loc.latitude,
-                        longitude: loc.longitude,
-                        timestamp: loc.timestamp,
-                        lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
-                        accuracy: loc.accuracy,
-                        speed: loc.speed,
-                        heading: loc.heading,
-                        address: geocodingResult.address,
-                    }
-                } catch {
-                    return {
-                        latitude: loc.latitude,
-                        longitude: loc.longitude,
-                        timestamp: loc.timestamp,
-                        lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
-                        accuracy: loc.accuracy,
-                        speed: loc.speed,
-                        heading: loc.heading,
-                        address: null,
+        // Listen to current live position
+        onValue(currentRef, (snapshot) => {
+            const v = snapshot.val()
+            console.log('📡 Raw current_location data from RTDB:', v)
+
+            if (v) {
+                // Handle the data structure - it might be a single object or have nested properties
+                let latitude = v.latitude
+                let longitude = v.longitude
+                let timestamp = v.timestamp || v.time || v.created_at
+                let accuracy = v.accuracy
+                let heading = v.heading
+                let speed = v.speed
+                let battery_level = v.battery_level
+                let device_status = v.device_status
+                let signal_strength = v.signal_strength
+
+                // If latitude/longitude are not direct properties, try to extract from nested structure
+                if (latitude === undefined && longitude === undefined) {
+                    // Check if it's stored as separate properties
+                    if (typeof v === 'object') {
+                        const keys = Object.keys(v)
+                        for (const key of keys) {
+                            if (key === 'latitude') latitude = v[key]
+                            if (key === 'longitude') longitude = v[key]
+                            if (key === 'timestamp') timestamp = v[key]
+                            if (key === 'accuracy') accuracy = v[key]
+                            if (key === 'speed') speed = v[key]
+                            if (key === 'heading') heading = v[key]
+                            if (key === 'battery_level') battery_level = v[key]
+                            if (key === 'device_status') device_status = v[key]
+                            if (key === 'signal_strength') signal_strength = v[key]
+                        }
                     }
                 }
-            })
-            const geocoded = await Promise.all(geocodePromises)
-            setLocationHistory(geocoded)
+
+                if (latitude !== undefined && longitude !== undefined) {
+                    console.log('📡 current_location update', { vehicleId, lat: latitude, lng: longitude, ts: timestamp })
+                    setLatestLocation(latitude, longitude, timestamp, {
+                        accuracy,
+                        heading,
+                        speed,
+                        battery_level,
+                        device_status,
+                        signal_strength
+                    })
+                } else {
+                    console.warn('📡 current_location update failed - invalid coordinates', { vehicleId, latitude, longitude })
+                }
+            }
         }, (error) => {
-            console.error("Firebase listener error:", error)
+            console.error("Firebase current_location listener error:", error)
+        })
+
+        // Listen to package-specific tracking path (some devices write here)
+        onValue(packageRef, (snapshot) => {
+            const v = snapshot.val()
+            if (v && typeof v.latitude === 'number' && typeof v.longitude === 'number') {
+                const ts = v.timestamp || v.lastUpdated || v.time
+                console.log('📦 tracking/<packageId> update', { packageId: packageData.package_id, lat: v.latitude, lng: v.longitude, ts })
+                setLatestLocation(v.latitude, v.longitude, ts, v)
+            }
+        }, (error) => {
+            console.error("Firebase tracking/<packageId> listener error:", error)
+        })
+
+        // Listen to history (for trail and as fallback) - try both paths
+        onValue(historyRef, async (snapshot) => {
+            const data = snapshot.val()
+            console.log('📜 Raw history data from RTDB:', data)
+
+            if (!data) {
+                console.log('📜 No history data available')
+                return
+            }
+
+            let allLocations: any[] = []
+
+            // Handle different data structures
+            if (Array.isArray(data)) {
+                // If it's an array
+                allLocations = data.map((loc: any, idx: number) => ({
+                    ...loc,
+                    _ts: normalizeTimestamp(loc.timestamp ?? loc.time ?? loc.created_at ?? Date.now() - idx * 1000)
+                }))
+            } else if (typeof data === 'object') {
+                // If it's an object with keys
+                const rawLocations = Object.keys(data).map(key => ({ ...data[key], key }))
+                allLocations = rawLocations
+                    .map((loc: any) => ({
+                        ...loc,
+                        _ts: normalizeTimestamp(loc.timestamp ?? loc.time ?? loc.created_at ?? loc.key)
+                    }))
+            }
+
+            // Filter and sort valid locations
+            allLocations = allLocations
+                .filter((loc: any) => loc.latitude !== undefined && loc.longitude !== undefined && isPlausibleTimestamp(loc._ts))
+                .sort((a: any, b: any) => b._ts - a._ts)
+
+            console.log('📜 Processed history locations:', { count: allLocations.length })
+
+            if (allLocations.length > 0) {
+                const latest = allLocations[0]
+                console.log('📜 history latest', { vehicleId, lat: latest.latitude, lng: latest.longitude, ts: latest._ts })
+
+                // Only update if this is newer than current location
+                if (!currentLocation || latest._ts > currentLocation.timestamp) {
+                    await setLatestLocation(latest.latitude, latest.longitude, latest._ts, latest)
+                }
+
+                // Process recent locations for history display
+                const recent = allLocations.slice(0, 4)
+                const geocoded = await Promise.all(recent.map(async (loc: any) => {
+                    const ts = loc._ts
+                    try {
+                        const geocodingResult = await geocodingService.geocode(loc.latitude, loc.longitude)
+                        return {
+                            latitude: loc.latitude,
+                            longitude: loc.longitude,
+                            timestamp: ts,
+                            lastUpdated: new Date(ts).toISOString(),
+                            accuracy: loc.accuracy,
+                            speed: loc.speed,
+                            heading: loc.heading,
+                            battery_level: loc.battery_level,
+                            device_status: loc.device_status,
+                            signal_strength: loc.signal_strength,
+                            address: geocodingResult.address,
+                        }
+                    } catch {
+                        return {
+                            latitude: loc.latitude,
+                            longitude: loc.longitude,
+                            timestamp: ts,
+                            lastUpdated: new Date(ts).toISOString(),
+                            accuracy: loc.accuracy,
+                            speed: loc.speed,
+                            heading: loc.heading,
+                            battery_level: loc.battery_level,
+                            device_status: loc.device_status,
+                            signal_strength: loc.signal_strength,
+                            address: null,
+                        }
+                    }
+                }))
+
+                console.log('🧭 history geocoded ready', {
+                    vehicleId,
+                    count: geocoded.length,
+                    first: geocoded[0] ? { lat: geocoded[0].latitude, lng: geocoded[0].longitude, ts: geocoded[0].timestamp } : null
+                })
+                setLocationHistory(geocoded)
+            }
+        }, (error) => {
+            console.error("Firebase history listener error:", error)
         })
 
         // Refresh non-location data lightly every 15s to keep progress/ETAs up to date
@@ -158,10 +333,11 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
         }, 15000)
 
         return () => {
-            console.log("🔥 Cleaning up Firebase listener for", vehicleId)
-            off(locationRef)
+            console.log("🔥 Cleaning up Firebase listeners for", vehicleId)
+            off(historyRef)
+            off(currentRef)
+            off(packageRef)
             clearInterval(metaRefresh)
-            if (unsubscribe && typeof unsubscribe === 'function') unsubscribe()
         }
     }, [packageData?.package_id, packageData?.status, packageData?.assigned_car])
 
@@ -242,18 +418,36 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
                                     className="h-12 text-base border-0 shadow-md rounded-lg"
                                 />
                             </div>
-                            <Button 
-                                type="submit" 
-                                disabled={loading || !trackingNumber.trim()}
-                                className="h-12 px-6 text-base bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-md font-medium"
-                            >
-                                {loading ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Search className="mr-2 h-4 w-4" />
+                            <div className="flex gap-3">
+                                <Button
+                                    type="submit"
+                                    disabled={loading || !trackingNumber.trim()}
+                                    className="h-12 px-6 text-base bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-md font-medium"
+                                >
+                                    {loading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Search className="mr-2 h-4 w-4" />
+                                    )}
+                                    Track
+                                </Button>
+                                {packageData && (
+                                    <Button
+                                        type="button"
+                                        onClick={() => fetchTrackingData(trackingNumber)}
+                                        disabled={loading}
+                                        variant="outline"
+                                        className="h-12 px-6 text-base border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg shadow-md font-medium"
+                                    >
+                                        {loading ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <ArrowRight className="mr-2 h-4 w-4" />
+                                        )}
+                                        Refresh
+                                    </Button>
                                 )}
-                                Track
-                            </Button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -378,11 +572,16 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
                                     </CardTitle>
                                     <CardDescription className="space-y-2 text-sm print:text-xs print:space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse print:animate-none print:w-2 h-2"></div>
-                                            <span className="font-medium">
+                                            <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse print:animate-none print:w-2 h-2"></div>
+                                            <span className="font-medium text-green-700">
+                                                🔴 Live Tracking Active
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                                            <span>
                                                 {currentLocation
                                                     ? `Last updated: ${new Date(currentLocation.lastUpdated).toLocaleString()}`
-                                                    : "No GPS data available"}
+                                                    : "Waiting for GPS data..."}
                                             </span>
                                         </div>
                                         {currentLocation && (
@@ -407,6 +606,21 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
                                                         {currentLocation.vehicleId && (
                                                             <p className="text-xs text-blue-600 font-medium mt-0.5 print:text-xs print:mt-0">
                                                                 Vehicle: {currentLocation.vehicleId}
+                                                            </p>
+                                                        )}
+                                                        {currentLocation.battery_level !== undefined && (
+                                                            <p className="text-xs text-green-600 font-medium mt-0.5 print:text-xs print:mt-0">
+                                                                🔋 Battery: {currentLocation.battery_level}%
+                                                            </p>
+                                                        )}
+                                                        {currentLocation.device_status && (
+                                                            <p className="text-xs text-purple-600 font-medium mt-0.5 print:text-xs print:mt-0">
+                                                                📡 Status: {currentLocation.device_status}
+                                                            </p>
+                                                        )}
+                                                        {currentLocation.signal_strength !== undefined && (
+                                                            <p className="text-xs text-orange-600 font-medium mt-0.5 print:text-xs print:mt-0">
+                                                                📶 Signal: {currentLocation.signal_strength} dBm
                                                             </p>
                                                         )}
                                                     </div>

@@ -2,6 +2,12 @@ import { sql } from '@/lib/database';
 import { database } from '@/lib/firebase';
 import { NextResponse } from 'next/server';
 
+// Ensure this API is always dynamic and never cached
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+
 export async function GET() {
   let databaseError = null;
   let firebaseError = null;
@@ -210,7 +216,9 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(responseData, {
+      headers: { 'Cache-Control': 'no-store' }
+    });
 
   } catch (error) {
     console.error('Dashboard stats API complete failure:', error);
@@ -257,6 +265,6 @@ export async function GET() {
       errorMessage: error instanceof Error ? error.message : 'Unknown error occurred'
     };
 
-    return NextResponse.json(errorResponse, { status: 500 });
+    return NextResponse.json(errorResponse, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
