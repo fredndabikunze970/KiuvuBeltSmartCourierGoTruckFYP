@@ -81,99 +81,87 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
         }
     }, [trackingId])
 
-    // Real-time Firebase location updates
+    // Real-time Firebase location updates (single live subscription, no polling)
     useEffect(() => {
         const activeStatuses = ["in_transit", "out_for_delivery"]
         if (!packageData || !activeStatuses.includes(packageData.status)) return
 
         const vehicleId = currentLocation?.vehicleId || packageData.assigned_car || 'CAR001'
+        const locationRef = ref(db, `location_history/${vehicleId}`)
 
         console.log("🔥 Setting up Firebase real-time updates for vehicle:", vehicleId)
 
-        const locationRef = ref(db, `location_history/${vehicleId}`)
+        const unsubscribe = onValue(locationRef, async (snapshot) => {
+            const data = snapshot.val()
+            if (!data) return
 
-        const fetchLocation = async () => {
-            onValue(locationRef, async (snapshot) => {
-                const data = snapshot.val()
-                if (data) {
-                    const keys = Object.keys(data)
-                    const allLocations = keys.map(key => ({
-                        ...data[key],
-                        key: key
-                    })).sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0))
+            const allLocations = Object.keys(data).map(key => ({ ...data[key], key })).sort(
+                (a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)
+            )
+            const latestLocation = allLocations[0]
+            const timestamp = latestLocation.timestamp || Date.now()
 
-                    const latestLocation = allLocations[0]
+            // Geocode current location (best-effort)
+            let currentAddress: string | undefined = undefined
+            try {
+                const geocodingResult = await geocodingService.geocode(latestLocation.latitude, latestLocation.longitude)
+                currentAddress = geocodingResult.address
+            } catch (error) {
+                console.warn("Geocoding current location failed:", error)
+            }
 
-                    console.log("📍 Real-time location update:", latestLocation)
-
-                    const timestamp = latestLocation.timestamp || Date.now()
-
-                    // Geocode the current location
-                    let currentAddress: string | undefined = undefined
-                    try {
-                        const geocodingResult = await geocodingService.geocode(latestLocation.latitude, latestLocation.longitude)
-                        currentAddress = geocodingResult.address
-                    } catch (error) {
-                        console.error("Error geocoding current location:", error)
-                    }
-
-                    setCurrentLocation({
-                        latitude: latestLocation.latitude,
-                        longitude: latestLocation.longitude,
-                        timestamp: timestamp,
-                        lastUpdated: new Date(timestamp).toISOString(),
-                        vehicleId: vehicleId,
-                        address: currentAddress,
-                    })
-
-                    // Geocode the real-time locations
-                    const geocodePromises = allLocations.slice(0, 4).map(async (loc: any) => {
-                        try {
-                            const geocodingResult = await geocodingService.geocode(loc.latitude, loc.longitude)
-                            return {
-                                latitude: loc.latitude,
-                                longitude: loc.longitude,
-                                timestamp: loc.timestamp,
-                                lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
-                                accuracy: loc.accuracy,
-                                speed: loc.speed,
-                                heading: loc.heading,
-                                address: geocodingResult.address,
-                            }
-                        } catch (error) {
-                            console.error("Error geocoding real-time location:", error)
-                            return {
-                                latitude: loc.latitude,
-                                longitude: loc.longitude,
-                                timestamp: loc.timestamp,
-                                lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
-                                accuracy: loc.accuracy,
-                                speed: loc.speed,
-                                heading: loc.heading,
-                                address: null,
-                            }
-                        }
-                    })
-
-                    const geocodedLocations = await Promise.all(geocodePromises)
-                    setLocationHistory(geocodedLocations)
-                }
-            }, (error) => {
-                console.error("Firebase listener error:", error)
+            setCurrentLocation({
+                latitude: latestLocation.latitude,
+                longitude: latestLocation.longitude,
+                timestamp,
+                lastUpdated: new Date(timestamp).toISOString(),
+                vehicleId,
+                address: currentAddress,
             })
-        }
 
-        fetchLocation()
-        const intervalId = setInterval(fetchLocation, 3000)
-        const fullRefreshId = setInterval(() => {
+            // Keep a recent trail for the side panel and polyline
+            const geocodePromises = allLocations.slice(0, 4).map(async (loc: any) => {
+                try {
+                    const geocodingResult = await geocodingService.geocode(loc.latitude, loc.longitude)
+                    return {
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                        timestamp: loc.timestamp,
+                        lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
+                        accuracy: loc.accuracy,
+                        speed: loc.speed,
+                        heading: loc.heading,
+                        address: geocodingResult.address,
+                    }
+                } catch {
+                    return {
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                        timestamp: loc.timestamp,
+                        lastUpdated: new Date(loc.timestamp || Date.now()).toISOString(),
+                        accuracy: loc.accuracy,
+                        speed: loc.speed,
+                        heading: loc.heading,
+                        address: null,
+                    }
+                }
+            })
+            const geocoded = await Promise.all(geocodePromises)
+            setLocationHistory(geocoded)
+        }, (error) => {
+            console.error("Firebase listener error:", error)
+        })
+
+        // Refresh non-location data lightly every 15s to keep progress/ETAs up to date
+        const metaRefresh = setInterval(() => {
             fetchTrackingData(packageData.package_id)
-        }, 5000) // Poll API every 5 seconds for real-time updates
+        }, 15000)
 
         return () => {
-            console.log("🔥 Cleaning up Firebase listener")
+            console.log("🔥 Cleaning up Firebase listener for", vehicleId)
             off(locationRef)
-            clearInterval(intervalId)
-            clearInterval(fullRefreshId)
+            clearInterval(metaRefresh)
+            if (unsubscribe && typeof unsubscribe === 'function') unsubscribe()
         }
     }, [packageData?.package_id, packageData?.status, packageData?.assigned_car])
 

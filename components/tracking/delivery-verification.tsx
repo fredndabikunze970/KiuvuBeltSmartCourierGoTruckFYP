@@ -54,16 +54,27 @@ export function DeliveryVerification() {
 
   if (success) {
     return (
-      <Card>
+      <Card className="border-green-200 bg-green-50/50">
         <CardContent className="text-center py-12">
-          <div className="mx-auto bg-green-100 text-green-600 p-3 rounded-full w-fit mb-4">
-            <CheckCircle className="h-8 w-8" />
+          <div className="mx-auto bg-green-100 text-green-600 p-4 rounded-full w-fit mb-6 animate-pulse">
+            <CheckCircle className="h-10 w-10" />
           </div>
-          <h3 className="text-lg font-semibold mb-2 text-green-600">Delivery Verified Successfully!</h3>
-          <p className="text-muted-foreground mb-4">The package has been marked as delivered in our system.</p>
-          <Button onClick={() => setSuccess(false)} variant="outline">
-            Verify Another Package
-          </Button>
+          <h3 className="text-2xl font-bold mb-3 text-green-700">Delivery Verified Successfully!</h3>
+          <p className="text-muted-foreground mb-6 text-lg">
+            The package has been marked as delivered in our system. Thank you for using KIVU Belt Express!
+          </p>
+          <div className="space-y-3">
+            <Button onClick={() => setSuccess(false)} variant="outline" className="w-full">
+              Verify Another Package
+            </Button>
+            <Button
+              onClick={() => window.location.href = '/'}
+              variant="default"
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              Return to Home
+            </Button>
+          </div>
         </CardContent>
       </Card>
     )

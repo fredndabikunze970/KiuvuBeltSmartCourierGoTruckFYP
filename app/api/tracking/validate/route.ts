@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 
+// Ensure this route is always dynamic and never statically rendered/cached
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+
 // Convert a JS Date to Africa/Kigali time using PostgreSQL for consistent TZ handling
 async function getNowInKigaliISO(): Promise<string> {
   const rows = await sql<{ now: string }[]>`SELECT (now() AT TIME ZONE 'Africa/Kigali')::timestamp AS now`
