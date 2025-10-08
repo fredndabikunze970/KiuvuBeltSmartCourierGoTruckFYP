@@ -61,6 +61,12 @@ const agentNavItems = [
       { href: "/track", icon: Truck, label: "Track Package" },
       { href: "/verify", icon: MapPin, label: "Verify Delivery" },
     ]
+  },
+  {
+    group: "System",
+    items: [
+      { href: "/dashboard/payments", icon: CreditCard, label: "Payments" },
+    ]
   }
 ]
 

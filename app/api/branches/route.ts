@@ -20,12 +20,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { branch_name, latitude, longitude, address } = await request.json()
+    const data = await request.json()
+    const branch_name = data.branch_name || ""
+    const latitude = data.latitude || 0
+    const longitude = data.longitude || 0
+    const address = data.address || ""
 
     const branch_id = generateBranchId()
     const result = await sql`
-      INSERT INTO branches (branch_id, branch_name, latitude, longitude, address) 
-      VALUES (${branch_id}, ${branch_name}, ${latitude}, ${longitude}, ${address}) 
+      INSERT INTO branches (branch_id, branch_name, latitude, longitude, address)
+      VALUES (${branch_id}, ${branch_name}, ${latitude}, ${longitude}, ${address})
       RETURNING *
     `
 

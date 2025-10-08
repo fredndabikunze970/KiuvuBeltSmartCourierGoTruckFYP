@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { sql } from '@/lib/database'
 import { generatePackageId, generatePaymentReference, generatePickupCode } from '@/lib/generators'
 import { sendSMS } from '@/lib/sms'
+import { formatPhoneNumber } from '@/lib/utils'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
         declared_value,
         delivery_fee,
         priority,
+        assigned_car,
+        assigned_driver,
         agent_id,
         status,
         delivery_time
@@ -63,6 +66,8 @@ export async function POST(request: NextRequest) {
         ${data.declaredValue},
         ${data.deliveryFee},
         ${data.priority || 'normal'},
+        ${data.assignedCarId || null},
+        ${data.assignedDriverId || null},
         ${user.user_id},
         'registered',
         ${data.deliveryTime || null}
@@ -129,14 +134,12 @@ export async function POST(request: NextRequest) {
       console.log('📱 Preparing to send SMS notifications...');
 
       // Format phone numbers (remove spaces, ensure +250 prefix)
-      const senderPhone = packageData.sender_phone.trim().replace(/^\+?/, '+');
-      const receiverPhone = packageData.receiver_phone.trim().replace(/^\+?/, '+');
+      const senderPhone = formatPhoneNumber(packageData.sender_phone.trim());
+      const receiverPhone = formatPhoneNumber(packageData.receiver_phone.trim());
 
       // Send SMS to sender
       console.log(`📱 Sending SMS to sender (${senderPhone})...`);
-      const senderMessage = `KIVU Belt Express: Your package ${packageData.package_id} has been registered successfully. 
-🔒 Your pickup code: ${packageData.pickup_code}
-📦 Track your package at: ${trackingUrl}`;
+      const senderMessage = `KIVU Belt Express: Package ${packageData.package_id} registered. Code: ${packageData.pickup_code}. Track: ${trackingUrl}`;
       const senderSMSResult = await sendSMS({
         to: senderPhone,
         message: senderMessage
@@ -152,10 +155,7 @@ export async function POST(request: NextRequest) {
 
       // Send SMS to receiver
       console.log(`📱 Sending SMS to receiver (${receiverPhone})...`);
-      const receiverMessage = `KIVU Belt Express: A package ${packageData.package_id} from ${packageData.sender_name} is registered for you.
-🔒 Package pickup code: ${packageData.pickup_code}
-📅 Expected delivery: ${new Date(packageData.delivery_time).toLocaleDateString()}
-📦 Track your package at: ${trackingUrl}`;
+      const receiverMessage = `KIVU Belt Express: Package ${packageData.package_id} from ${packageData.sender_name}. Code: ${packageData.pickup_code}. Track: ${trackingUrl}`;
       const receiverSMSResult = await sendSMS({
         to: receiverPhone,
         message: receiverMessage

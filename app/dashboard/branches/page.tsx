@@ -14,44 +14,33 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { apiService } from "@/lib/api"
-import { branchSchema } from "@/lib/validations/management"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { apiService, type Branch } from "@/lib/api"
 import { Building2, Edit, Loader2, MapPin, Plus, Trash } from "lucide-react"
-import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
-import type * as z from "zod"
 
-const LeafletMap = dynamic(
-  () => import("@/components/maps/leaflet-map").then(mod => mod.LeafletMap),
-  { ssr: false }
-)
+// Removed local Branch type definition, now imported from lib/api
 
-type Branch = {
-  branch_id: string
+type BranchFormData = {
   branch_name: string
-  latitude: number
-  longitude: number
+  latitude: string
+  longitude: string
   address: string
 }
-
-type BranchFormData = z.infer<typeof branchSchema>
 
 export default function BranchManagementPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null)
-  const [mapPosition, setMapPosition] = useState<[number, number]>([-1.94995, 30.05885])
+  const [isDialogOpen, setIsDialogOpen] = useState(false) // New state to control dialog
   const { toast } = useToast()
 
   const form = useForm<BranchFormData>({
-    resolver: zodResolver(branchSchema),
     defaultValues: {
       branch_name: "",
-      latitude: 0,
-      longitude: 0,
-      address: "",
+      latitude: "-1.94995", // Default for new branch
+      longitude: "30.05885", // Default for new branch
+      address: "", // Default to empty string
     },
   })
 
@@ -77,23 +66,32 @@ export default function BranchManagementPage() {
   const onSubmit = async (data: BranchFormData) => {
     try {
       if (selectedBranch) {
+        console.log("Submitting update for branch:", selectedBranch.branch_id, data);
         await apiService.updateBranch(selectedBranch.branch_id, data)
         toast({
           title: "Success",
           description: "Branch updated successfully",
         })
       } else {
+        console.log("Submitting new branch:", data);
         await apiService.createBranch(data)
         toast({
           title: "Success",
           description: "Branch created successfully",
         })
       }
-      
+
       fetchBranches()
-      form.reset()
+      form.reset({
+        branch_name: "",
+        latitude: "-1.94995",
+        longitude: "30.05885",
+        address: "",
+      });
       setSelectedBranch(null)
+      setIsDialogOpen(false) // Close dialog on successful submission
     } catch (error) {
+      console.error("Submission error:", error);
       toast({
         title: "Error",
         description: selectedBranch ? "Failed to update branch" : "Failed to create branch",
@@ -122,19 +120,15 @@ export default function BranchManagementPage() {
   }
 
   const handleEdit = (branch: Branch) => {
+    console.log("Opening Edit dialog for branch:", branch);
     setSelectedBranch(branch)
     form.reset({
       branch_name: branch.branch_name,
-      latitude: branch.latitude,
-      longitude: branch.longitude,
+      latitude: branch.latitude.toString(),
+      longitude: branch.longitude.toString(),
       address: branch.address,
-    })
-    setMapPosition([branch.latitude, branch.longitude])
-  }
-
-  const handleMapClick = (position: { lat: number; lng: number }) => {
-    form.setValue("latitude", position.lat)
-    form.setValue("longitude", position.lng)
+    });
+    setIsDialogOpen(true) // Open dialog for editing
   }
 
   if (loading) {
@@ -147,20 +141,73 @@ export default function BranchManagementPage() {
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Branch Management</h1>
-          <p className="text-muted-foreground">Manage your delivery branches and locations</p>
-        </div>
-        <Dialog>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}> {/* Dialog wraps everything */}
+        <div className="container mx-auto py-6">
+          <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Branch Management</h1>
+            <p className="text-muted-foreground">Manage your delivery branches and locations</p>
+          </div>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Branch
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+              <Button onClick={() => {
+                console.log("Opening Add New Branch dialog. selectedBranch should be null.");
+                setSelectedBranch(null) // Ensure adding new branch starts fresh
+                form.reset({
+                  branch_name: "",
+                  latitude: "-1.94995", // Default for new branch
+                  longitude: "30.05885", // Default for new branch
+                  address: "", // Default to empty string
+                });
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Branch
+              </Button>
+            </DialogTrigger>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {branches.map((branch) => (
+              <div
+                key={branch.branch_id}
+                className="p-4 border rounded-lg shadow-sm space-y-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold">{branch.branch_name}</h3>
+                  </div>
+                  <div className="flex space-x-2">
+                    <DialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleEdit(branch)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDelete(branch.branch_id)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>{branch.address}</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <p>Latitude: {Number(branch.latitude).toFixed(6)}</p>
+                  <p>Longitude: {Number(branch.longitude).toFixed(6)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <DialogContent> {/* DialogContent is now correctly inside the Dialog */}
             <DialogHeader>
               <DialogTitle>{selectedBranch ? "Edit Branch" : "Add New Branch"}</DialogTitle>
               <DialogDescription>
@@ -174,34 +221,16 @@ export default function BranchManagementPage() {
                 <Label htmlFor="branch_name">Branch Name</Label>
                 <Input
                   id="branch_name"
-                  {...form.register("branch_name")}
+                  required
+                  value={form.watch("branch_name") || ""}
+                  onChange={(e) => form.setValue("branch_name", e.target.value)}
                   placeholder="e.g., Kigali Main Branch"
                 />
-                {form.formState.errors.branch_name && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.branch_name.message}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Location</Label>
-                <div className="h-[200px] border rounded-md overflow-hidden">
-                  <LeafletMap
-                    center={mapPosition}
-                    zoom={13}
-                    onClick={handleMapClick}
-                    markers={[
-                      {
-                        position: [
-                          form.getValues("latitude") || mapPosition[0],
-                          form.getValues("longitude") || mapPosition[1],
-                        ],
-                        title: form.getValues("branch_name") || "New Branch",
-                      },
-                    ]}
-                  />
-                </div>
+                <p className="text-sm text-muted-foreground">Click on the map to set coordinates (map removed for data-only view)</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -211,13 +240,11 @@ export default function BranchManagementPage() {
                     id="latitude"
                     type="number"
                     step="any"
-                    {...form.register("latitude", { valueAsNumber: true })}
+                    required
+                    placeholder="-1.94995"
+                    value={form.watch("latitude") || ""}
+                    onChange={(e) => form.setValue("latitude", e.target.value)}
                   />
-                  {form.formState.errors.latitude && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.latitude.message}
-                    </p>
-                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="longitude">Longitude</Label>
@@ -225,13 +252,11 @@ export default function BranchManagementPage() {
                     id="longitude"
                     type="number"
                     step="any"
-                    {...form.register("longitude", { valueAsNumber: true })}
+                    required
+                    placeholder="30.05885"
+                    value={form.watch("longitude") || ""}
+                    onChange={(e) => form.setValue("longitude", e.target.value)}
                   />
-                  {form.formState.errors.longitude && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.longitude.message}
-                    </p>
-                  )}
                 </div>
               </div>
 
@@ -239,20 +264,23 @@ export default function BranchManagementPage() {
                 <Label htmlFor="address">Address</Label>
                 <Input
                   id="address"
-                  {...form.register("address")}
+                  required
+                  value={form.watch("address") || ""}
+                  onChange={(e) => form.setValue("address", e.target.value)}
                   placeholder="Street address, city"
                 />
-                {form.formState.errors.address && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.address.message}
-                  </p>
-                )}
               </div>
 
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={() => {
-                  form.reset()
+                  form.reset({
+                    branch_name: "",
+                    latitude: "-1.94995",
+                    longitude: "30.05885",
+                    address: "",
+                  });
                   setSelectedBranch(null)
+                  setIsDialogOpen(false) // Close dialog on cancel
                 }}>
                   Cancel
                 </Button>
@@ -261,56 +289,6 @@ export default function BranchManagementPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {branches.map((branch) => (
-          <div
-            key={branch.branch_id}
-            className="p-4 border rounded-lg shadow-sm space-y-4"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">{branch.branch_name}</h3>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleEdit(branch)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleDelete(branch.branch_id)}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{branch.address}</span>
-            </div>
-            <div className="h-[120px] border rounded-md overflow-hidden">
-              <LeafletMap
-                center={[branch.latitude, branch.longitude]}
-                zoom={13}
-                markers={[
-                  {
-                    position: [branch.latitude, branch.longitude],
-                    title: branch.branch_name,
-                  },
-                ]}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
     </DashboardLayout>
   )
 }

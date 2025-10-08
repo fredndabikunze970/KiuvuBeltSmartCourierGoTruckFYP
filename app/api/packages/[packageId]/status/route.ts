@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
+import { getAuthUser } from "@/lib/auth-middleware"
 
 const PROGRESS: Record<string, number> = {
   registered: 0,
@@ -14,6 +15,16 @@ const ALLOWED = new Set(Object.keys(PROGRESS))
 
 export async function PUT(req: NextRequest, { params }: { params: { packageId: string } }) {
   try {
+    const user = getAuthUser(req)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Only admin and agents can update package status
+    if (user.role !== "admin" && user.role !== "agent") {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
     const packageId = params.packageId
     const body = await req.json().catch(() => ({}))
     const {

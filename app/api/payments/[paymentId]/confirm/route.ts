@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { sql } from "@/lib/database"
 import { sendTemplatedSMS } from "@/lib/sms"
+import { formatPhoneNumber } from "@/lib/utils"
 import { NextResponse, type NextRequest } from "next/server"
 
 // Add the generatePaymentReference function here
@@ -32,7 +33,7 @@ export async function POST(
     }
 
     const { paymentId } = params
-    let data = {}
+    let data: { payment_method?: string } = {}
     try {
       data = await request.json()
     } catch (e) {
@@ -100,8 +101,9 @@ export async function POST(
     // Send confirmation SMS to both sender and receiver
     try {
       // Send to sender - use currentPayment.sender_phone which we selected earlier
+      const formattedSenderPhone = formatPhoneNumber(currentPayment.sender_phone);
       await sendTemplatedSMS(
-        currentPayment.sender_phone,
+        formattedSenderPhone,
         "PAYMENT_RECEIVED",
         currentPayment.amount,
         currentPayment.package_id

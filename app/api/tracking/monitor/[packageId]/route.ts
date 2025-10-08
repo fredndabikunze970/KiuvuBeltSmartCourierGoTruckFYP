@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
+import { formatPhoneNumber } from "@/lib/utils"
 
 function toRad(v: number) { return (v * Math.PI) / 180 }
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -187,8 +188,18 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
     // 7) SMS alerts for off-route (best-effort)
     if (offRoute) {
       const msg = `ALERT: Package ${packageId} vehicle is off route. Deviation: ${deviationKm.toFixed(2)}km`
-      try { pkg.sender_phone && await sendSMS({ to: pkg.sender_phone, message: msg }) } catch {}
-      try { pkg.receiver_phone && await sendSMS({ to: pkg.receiver_phone, message: msg }) } catch {}
+      try {
+        if (pkg.sender_phone) {
+          const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone);
+          await sendSMS({ to: formattedSenderPhone, message: msg })
+        }
+      } catch {}
+      try {
+        if (pkg.receiver_phone) {
+          const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone);
+          await sendSMS({ to: formattedReceiverPhone, message: msg })
+        }
+      } catch {}
     }
 
     return NextResponse.json({

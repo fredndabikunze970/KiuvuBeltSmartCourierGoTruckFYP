@@ -11,14 +11,14 @@ export async function GET(
       [params.id]
     )
 
-    if (!branch.rows[0]) {
+    if (!branch[0]) {
       return NextResponse.json(
         { error: "Branch not found" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ branch: branch.rows[0] })
+    return NextResponse.json({ branch: branch[0] })
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch branch" },
@@ -32,24 +32,28 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { branch_name, latitude, longitude, address } = await request.json()
+    const data = await request.json()
+    const branch_name = data.branch_name || ""
+    const latitude = data.latitude || 0
+    const longitude = data.longitude || 0
+    const address = data.address || ""
 
     const result = await db.query(
-      `UPDATE branches 
+      `UPDATE branches
        SET branch_name = $1, latitude = $2, longitude = $3, address = $4, updated_at = NOW()
        WHERE branch_id = $5
        RETURNING *`,
       [branch_name, latitude, longitude, address, params.id]
     )
 
-    if (!result.rows[0]) {
+    if (!result[0]) {
       return NextResponse.json(
         { error: "Branch not found" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ branch: result.rows[0] })
+    return NextResponse.json({ branch: result[0] })
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update branch" },
@@ -68,7 +72,7 @@ export async function DELETE(
       [params.id]
     )
 
-    if (!result.rows[0]) {
+    if (!result[0]) {
       return NextResponse.json(
         { error: "Branch not found" },
         { status: 404 }

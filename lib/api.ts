@@ -99,7 +99,7 @@ interface Payment {
 }
 
 class ApiService {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
@@ -127,15 +127,20 @@ class ApiService {
     senderName: string
     senderPhone: string
     senderAddress: string
+    originBranchId: string
     receiverName: string
     receiverPhone: string
     receiverAddress: string
+    destinationBranchId: string
     packageDescription?: string
     weight?: number
     dimensions?: string
     declaredValue?: number
     deliveryFee: number
     priority?: "normal" | "express" | "urgent"
+    assignedCarId?: string
+    assignedDriverId?: string
+    deliveryTime?: string
   }): Promise<{ message: string; package: Package }> {
     return this.request("/packages/register", {
       method: "POST",
@@ -208,8 +213,8 @@ class ApiService {
 
   async createBranch(data: {
     branch_name: string
-    latitude: number
-    longitude: number
+    latitude: string
+    longitude: string
     address: string
   }): Promise<{ branch: Branch }> {
     return this.request('/branches', {
@@ -222,8 +227,8 @@ class ApiService {
     branchId: string,
     data: {
       branch_name: string
-      latitude: number
-      longitude: number
+      latitude: string
+      longitude: string
       address: string
     }
   ): Promise<{ branch: Branch }> {
@@ -335,7 +340,33 @@ class ApiService {
       longitude: number
       timestamp: number
       lastUpdated: string
+      vehicleId?: string
+      address?: string
     }
+    locationHistory?: Array<{
+      latitude: number
+      longitude: number
+      timestamp: number
+      lastUpdated: string
+      speed?: number
+      heading?: number
+      accuracy?: number
+      address?: string
+    }>
+    originBranch?: any
+    destinationBranch?: any
+    route?: any
+    routePolyline?: any
+    routeDistance?: number
+    distanceTraveled?: number
+    distanceRemaining?: number
+    estimatedTime?: number
+    estimatedArrival?: string
+    isOnRoute?: boolean
+    progress?: number
+    paymentStatus?: string
+    paymentConfirmed?: boolean
+    allowTrackingWithoutPayment?: boolean
   }> {
     return this.request(`/tracking/${packageId}`)
   }

@@ -84,25 +84,25 @@ export async function sendPackageNotification(
 
   switch (status) {
     case "registered":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been registered successfully. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} registered. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "picked_up":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been picked up and is now in transit. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} picked up, in transit. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "in_transit":
-      message = `KIVU Belt Express: Your package ${trackingNumber} is in transit${location ? ` at ${location}` : ""}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} in transit${location ? ` at ${location}` : ""}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "out_for_delivery":
-      message = `KIVU Belt Express: Your package ${trackingNumber} is out for delivery. Please be available to receive it. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} out for delivery. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
       break
     case "delivered":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been successfully delivered. Thank you for choosing us!`
+      message = `KIVU Belt Express: Package ${trackingNumber} delivered successfully. Thank you!`
       break
     case "cancelled":
-      message = `KIVU Belt Express: Your package ${trackingNumber} has been cancelled. Contact us for more information.`
+      message = `KIVU Belt Express: Package ${trackingNumber} cancelled. Contact us for info.`
       break
     default:
-      message = `KIVU Belt Express: Package ${trackingNumber} status updated to ${status}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
+      message = `KIVU Belt Express: Package ${trackingNumber} status: ${status}. Track: ${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`
   }
 
   return await sendSMS({
@@ -139,10 +139,10 @@ export const SMS_TEMPLATES = {
 export async function sendTemplatedSMS(
   phoneNumber: string,
   template: keyof typeof SMS_TEMPLATES,
-  ...args: [string] | [number, string] | [string, string]
+  ...args: any[]
 ): Promise<SMSResult> {
   const templateFn = SMS_TEMPLATES[template]
-  const message = typeof templateFn === "function" ? templateFn(...args) : templateFn
+  const message = typeof templateFn === "function" ? (templateFn as any)(...args) : templateFn
 
   return await sendSMS({
     to: phoneNumber,

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     let packages
 
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.role === "agent") {
       if (status && search) {
         packages = await sql`
           SELECT 
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
 
     // Get total count
     const totalResult =
-      user.role === "admin"
+      user.role === "admin" || user.role === "agent"
         ? await sql`SELECT COUNT(*) FROM packages`
         : await sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id}`
 

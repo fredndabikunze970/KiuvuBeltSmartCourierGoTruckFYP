@@ -10,8 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { apiService } from "@/lib/api"
-import type { Branch } from "@/lib/types"
+import { apiService, type Branch, type Car, type Driver } from "@/lib/api"
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,24 +26,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from "react"
 
-interface Branch {
-  branch_id: string;
-  branch_name: string;
-  address: string;
-}
 
-interface Driver {
-  driver_id: string;
-  full_name: string;
-  status: string;
-}
-
-interface Car {
-  car_id: string;
-  plate_number: string;
-  model: string;
-  status: string;
-}
 
 interface PackageFormData {
   senderName: string
@@ -245,10 +227,9 @@ export function PackageRegistrationForm() {
         declaredValue: "",
         deliveryFee: "",
         priority: "normal",
-        estimatedDeliveryTime: "",
-        deliveryNotes: "",
         assignedCarId: "",
-        assignedDriverId: ""
+        assignedDriverId: "",
+        deliveryTime: ""
       })
       setCurrentStep(1)
     } catch (err) {
