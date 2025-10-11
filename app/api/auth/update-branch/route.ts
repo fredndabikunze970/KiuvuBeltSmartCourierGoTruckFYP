@@ -51,4 +51,4 @@ export const PATCH = requireAuth(async (request: NextRequest, user: AuthUser) =>
       { status: 500 }
     )
   }
-}
+})
