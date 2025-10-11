@@ -171,7 +171,7 @@ export default function PaymentsPage() {
       const requestBody = {
         payment_method: selectedPaymentMethod,
         notes: notes.trim() || undefined,
-        confirmed_by: authService.getCurrentUser()?.id
+        confirmed_by: authService.getCurrentUser()?.userId
       }
 
       console.log('Sending confirmation request:', requestBody)
@@ -203,7 +203,7 @@ export default function PaymentsPage() {
               payment_method: selectedPaymentMethod,
               confirmed_at: new Date().toISOString(),
               notes: notes.trim() || payment.notes,
-              confirmed_by: authService.getCurrentUser()?.id
+              confirmed_by: authService.getCurrentUser()?.userId
             }
             : payment
         )
@@ -224,9 +224,9 @@ export default function PaymentsPage() {
   const getStatusVariant = (status: Payment["payment_status"]) => {
     switch (status) {
       case 'confirmed':
-        return 'success'
+        return 'default'
       case 'pending':
-        return 'warning'
+        return 'secondary'
       case 'failed':
         return 'destructive'
       default:
@@ -319,17 +319,17 @@ export default function PaymentsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-yellow-600">Pending</p>
-                    <p className="text-2xl font-bold text-yellow-900 mt-1">
+                    <p className="text-sm font-medium text-amber-600">Pending</p>
+                    <p className="text-2xl font-bold text-amber-900 mt-1">
                       {payments.filter(p => p.payment_status === 'pending').length}
                     </p>
                   </div>
-                  <div className="p-3 bg-yellow-100 rounded-full">
-                    <Clock className="w-6 h-6 text-yellow-600" />
+                  <div className="p-3 bg-amber-100 rounded-full">
+                    <Clock className="w-6 h-6 text-amber-600" />
                   </div>
                 </div>
               </CardContent>

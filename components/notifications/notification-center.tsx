@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { authService } from "@/lib/auth"
 import { Bell, CheckCheck, Filter, MessageSquare, RefreshCw, Search } from "lucide-react"
 import { useEffect, useState } from "react"
 
@@ -41,7 +42,14 @@ export function NotificationCenter() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications');
+      const response = await fetch('/api/notifications', {
+        headers: authService.getAuthHeaders(),
+      });
+      if (response.status === 401) {
+        // Token invalid, redirect to login
+        authService.logout();
+        return;
+      }
       const data = await response.json();
       if (data.success) {
         setNotifications(data.data);
@@ -68,13 +76,18 @@ export function NotificationCenter() {
 
   const markAllAsRead = async () => {
     try {
-      await fetch('/api/notifications', {
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          ...authService.getAuthHeaders(),
         },
         body: JSON.stringify({ markAllAsRead: true }),
       });
+      if (response.status === 401) {
+        authService.logout();
+        return;
+      }
       setNotifications(notifications.map(n => ({ ...n, is_read: true })));
       toast({
         title: "Success",

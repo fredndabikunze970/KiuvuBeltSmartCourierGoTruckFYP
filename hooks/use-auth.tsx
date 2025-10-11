@@ -27,6 +27,7 @@ interface User {
   full_name: string
   role: string
   phone?: string
+  branch_id?: string
 }
 
 // Add the missing AuthContextType interface
@@ -218,9 +219,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Update state
       setUser(userData)
       setIsAuthenticated(true)
-      
-      console.log('Login successful, redirecting to dashboard...')
-      router.push('/dashboard')
+
+      console.log('Login successful, checking redirect...')
+      if (userData.role === 'agent' && !userData.branch_id) {
+        router.push('/select-branch')
+      } else {
+        router.push('/dashboard')
+      }
       
     } catch (error) {
       console.error('Login error:', error)

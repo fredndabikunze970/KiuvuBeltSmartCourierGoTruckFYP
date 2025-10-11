@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { authService } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
 interface Notification {
@@ -45,7 +46,17 @@ export const NotificationDropdown = () => {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch("/api/notifications", { cache: "no-store" })
+        const res = await fetch("/api/notifications", {
+          cache: "no-store",
+          headers: authService.getAuthHeaders(),
+        })
+        if (res.status === 401) {
+          if (isMounted) {
+            setError("Please login to view notifications")
+            setNotifications([])
+          }
+          return
+        }
         if (!res.ok) throw new Error(`Request failed: ${res.status}`)
         const data = await res.json()
         // API returns { success: boolean, data: Notification[] }
@@ -57,25 +68,7 @@ export const NotificationDropdown = () => {
         console.error("Failed to load notifications:", err)
         if (isMounted) {
           setError("Failed to load notifications")
-          // Fallback sample data to preserve UX
-          setNotifications([
-            {
-              id: "1",
-              notification_id: "1",
-              message: "Your package #XYZ123 has been delivered.",
-              notification_type: "delivery",
-              status: "unread",
-              created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            },
-            {
-              id: "2",
-              notification_id: "2",
-              message: "New package #ABC456 registered at Kigali Main Branch.",
-              notification_type: "package",
-              status: "read",
-              created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            },
-          ])
+          setNotifications([])
         }
       } finally {
         if (isMounted) setLoading(false)
@@ -113,7 +106,10 @@ export const NotificationDropdown = () => {
       )
       await fetch("/api/notifications", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authService.getAuthHeaders(),
+        },
         body: JSON.stringify({ notificationId: id }),
       })
     } catch (e) {
@@ -150,7 +146,7 @@ export const NotificationDropdown = () => {
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold border border-white">
+            <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold border border-white">
               {unreadCount}
             </span>
           )}

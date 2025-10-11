@@ -521,7 +521,7 @@ const AnalyticsContent = () => {
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-purple-600" />
+              <MapPin className="h-5 w-5 text-blue-600" />
               Branch Performance
             </CardTitle>
           </CardHeader>
@@ -705,18 +705,18 @@ const AnalyticsContent = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-purple-900 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-blue-900 flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Avg. Revenue per Delivery
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-900">
+            <div className="text-2xl font-bold text-blue-900">
               {totalDeliveries > 0 ? formatCurrency(totalRevenue / totalDeliveries) : 'RWF 0'}
             </div>
-            <p className="text-xs text-purple-700 mt-1">
+            <p className="text-xs text-blue-700 mt-1">
               Across all completed deliveries
             </p>
           </CardContent>

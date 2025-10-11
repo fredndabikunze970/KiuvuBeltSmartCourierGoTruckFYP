@@ -1,11 +1,11 @@
-import { auth } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth-middleware'
 import { sql } from '@/lib/database'
 import { generatePaymentReference } from '@/lib/generators'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await auth(request)
+    const user = await getAuthUser(request)
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please login first' },
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await auth(request)
+    const user = await getAuthUser(request)
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please login first' },
@@ -205,6 +205,11 @@ export async function GET(request: NextRequest) {
       WHERE 1=1
     `
 
+    // Add role-based filter
+    if (user.role === 'agent') {
+      query = sql`${query} AND pkg.origin_branch_id = ${user.branch_id}`
+    }
+
     // Add filters if provided
     if (packageId) {
       query = sql`${query} AND p.package_id = ${packageId}`
@@ -224,13 +229,26 @@ export async function GET(request: NextRequest) {
     const payments = await query
 
     // Get total count for pagination
-    const totalResult = await sql`
-      SELECT COUNT(*) 
-      FROM payments
+    let totalQuery = sql`
+      SELECT COUNT(*)
+      FROM payments p
+      LEFT JOIN packages pkg ON p.package_id = pkg.package_id
       WHERE 1=1
-      ${packageId ? sql`AND package_id = ${packageId}` : sql``}
-      ${status ? sql`AND payment_status = ${status}` : sql``}
     `
+
+    if (user.role === 'agent') {
+      totalQuery = sql`${totalQuery} AND pkg.origin_branch_id = ${user.branch_id}`
+    }
+
+    if (packageId) {
+      totalQuery = sql`${totalQuery} AND p.package_id = ${packageId}`
+    }
+
+    if (status) {
+      totalQuery = sql`${totalQuery} AND p.payment_status = ${status}`
+    }
+
+    const totalResult = await totalQuery
 
     const total = parseInt(totalResult[0].count)
 

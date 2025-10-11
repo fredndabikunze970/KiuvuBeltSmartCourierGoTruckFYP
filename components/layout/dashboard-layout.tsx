@@ -59,7 +59,7 @@ const agentNavItems = [
     items: [
       { href: "/dashboard/packages/register", icon: Plus, label: "Register Package" },
       { href: "/track", icon: Truck, label: "Track Package" },
-      { href: "/verify", icon: MapPin, label: "Verify Delivery" },
+      { href: "/dashboard/verify", icon: MapPin, label: "Verify Delivery" },
     ]
   },
   {
@@ -84,6 +84,7 @@ const adminNavItems = [
       { href: "/dashboard/packages", icon: Package, label: "All Packages" },
       { href: "/dashboard/packages/register", icon: Plus, label: "Register Package" },
       { href: "/track", icon: Truck, label: "Track Package" },
+      { href: "/dashboard/verify", icon: MapPin, label: "Verify Delivery" },
     ]
   },
   {
@@ -120,11 +121,13 @@ const getInitials = (fullName: string) => {
 const getRoleBadgeColor = (role: string) => {
   switch (role) {
     case 'admin':
-      return 'bg-red-500/15 text-red-700 border-red-200'
+      return 'bg-red-100 text-red-800 border-red-300'
     case 'agent':
-      return 'bg-blue-500/15 text-blue-700 border-blue-200'
+      return 'bg-blue-100 text-blue-800 border-blue-300'
+    case 'receiver':
+      return 'bg-green-100 text-green-800 border-green-300'
     default:
-      return 'bg-gray-500/15 text-gray-700 border-gray-200'
+      return 'bg-gray-100 text-gray-800 border-gray-300'
   }
 }
 
@@ -217,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     )} />
                     <span className="truncate">{item.label}</span>
                     {item.href === "/dashboard/notifications" && (
-                      <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                      <span className="ml-auto bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                         3
                       </span>
                     )}

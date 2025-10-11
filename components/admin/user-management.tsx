@@ -1,6 +1,6 @@
 "use client"
 
-import { RegisterForm } from "@/components/auth/register-form"
+import { AdminUserForm } from "@/components/admin/admin-user-form"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,15 +26,31 @@ interface User {
   phone: string | null
   role: "agent" | "admin" | "receiver"
   created_at: string
+  branch_id: string | null
+  branch_name: string | null
+}
+
+interface Branch {
+  branch_id: string
+  branch_name: string
 }
 
 export function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showAddUser, setShowAddUser] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editForm, setEditForm] = useState({
+    email: '',
+    full_name: '',
+    phone: '',
+    role: '',
+    branch_id: ''
+  })
 
   const fetchUsers = async () => {
     try {
@@ -58,6 +74,69 @@ export function UserManagement() {
       setUsers([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchBranches = async () => {
+    try {
+      const response = await fetch('/api/branches', {
+        headers: {
+          ...authService.getAuthHeaders(),
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setBranches(Array.isArray(data.branches) ? data.branches : [])
+      } else {
+        console.error("Failed to fetch branches:", await response.text())
+        setBranches([])
+      }
+    } catch (error) {
+      console.error("Failed to fetch branches:", error)
+      setBranches([])
+    }
+  }
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user)
+    setEditForm({
+      email: user.email,
+      full_name: user.full_name,
+      phone: user.phone || '',
+      role: user.role,
+      branch_id: user.branch_id || 'none'
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return
+
+    try {
+      const updateData = {
+        id: editingUser.id,
+        ...editForm,
+        branch_id: editForm.branch_id === 'none' ? null : editForm.branch_id
+      }
+
+      const response = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authService.getAuthHeaders(),
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (response.ok) {
+        fetchUsers()
+        setEditingUser(null)
+      } else {
+        console.error("Failed to update user:", await response.text())
+      }
+    } catch (error) {
+      console.error("Failed to update user:", error)
     }
   }
 
@@ -85,6 +164,7 @@ export function UserManagement() {
 
   useEffect(() => {
     fetchUsers()
+    fetchBranches()
   }, [])
 
   const filteredUsers = users.filter((user) => {
@@ -120,7 +200,7 @@ export function UserManagement() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
-        return "bg-purple-50 text-purple-700 border-purple-200 font-semibold"
+        return "bg-blue-50 text-blue-700 border-blue-200 font-semibold"
       case "agent":
         return "bg-blue-50 text-blue-700 border-blue-200 font-medium"
       case "receiver":
@@ -157,7 +237,80 @@ export function UserManagement() {
               <DialogTitle>Add New User</DialogTitle>
               <DialogDescription>Create a new agent or admin account</DialogDescription>
             </DialogHeader>
-            <RegisterForm />
+            <AdminUserForm branches={branches} />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>Update user information and permissions</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Full Name</label>
+                <Input
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  placeholder="Enter email"
+                  type="email"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Phone</label>
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Role</label>
+                <Select value={editForm.role} onValueChange={(value) => setEditForm({ ...editForm, role: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="agent">Agent</SelectItem>
+                    <SelectItem value="receiver">Receiver</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Branch</label>
+                <Select value={editForm.branch_id} onValueChange={(value) => setEditForm({ ...editForm, branch_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Branch</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                        {branch.branch_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setEditingUser(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -213,11 +366,12 @@ export function UserManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">User Information</TableHead>
+                  <TableHead className="w-[30%]">User Information</TableHead>
                   <TableHead className="w-[15%]">Role</TableHead>
+                  <TableHead className="w-[15%]">Branch</TableHead>
                   <TableHead className="w-[15%]">Status</TableHead>
                   <TableHead className="w-[15%]">Created</TableHead>
-                  <TableHead className="w-[15%]">Actions</TableHead>
+                  <TableHead className="w-[10%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -250,6 +404,11 @@ export function UserManagement() {
                           {getRoleIcon(user.role)}
                           <span className="capitalize">{user.role}</span>
                         </div>
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        {user.branch_name || 'No Branch'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -286,11 +445,12 @@ export function UserManagement() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
+                          onClick={() => handleEdit(user)}
                         >
-                          <svg 
-                            className="h-4 w-4" 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            viewBox="0 0 20 20" 
+                          <svg
+                            className="h-4 w-4"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
                             fill="currentColor"
                           >
                             <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />

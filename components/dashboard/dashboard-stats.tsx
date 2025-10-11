@@ -75,8 +75,8 @@ export function DashboardStats() {
       value: stats.in_transit + stats.out_for_delivery,
       description: "Currently being delivered",
       icon: Truck,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
     },
     {
       title: "Delivered",
@@ -91,8 +91,8 @@ export function DashboardStats() {
       value: stats.registered + stats.picked_up,
       description: "Awaiting pickup/transit",
       icon: Clock,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
+      color: "text-amber-600",
+      bgColor: "bg-amber-100",
     },
   ]
 

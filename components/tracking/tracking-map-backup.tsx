@@ -274,7 +274,7 @@ export function TrackingMap({
                     const histMarker = window.L.circleMarker([loc.latitude, loc.longitude], {
                         radius: 4,
                         fillColor: "#10b981",
-                        color: "#fff",
+                        color: "#ffffff",
                         weight: 1,
                         opacity: 0.8,
                         fillOpacity: 0.6,
@@ -311,7 +311,7 @@ export function TrackingMap({
             case "registered":
                 return "#6b7280"
             case "picked_up":
-                return "#eab308"
+                return "#f59e0b"
             case "in_transit":
                 return "#8b5cf6"
             case "out_for_delivery":

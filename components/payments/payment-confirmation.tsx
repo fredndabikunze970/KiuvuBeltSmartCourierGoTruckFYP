@@ -185,7 +185,7 @@ export default function PaymentsPage() {
           payment_method: selectedPaymentMethod,
           transaction_reference: transactionReference.trim(),
           notes: notes.trim() || undefined,
-          confirmed_by: authService.getCurrentUser()?.id
+          confirmed_by: authService.getCurrentUser()?.userId
         }),
       })
 
@@ -207,7 +207,7 @@ export default function PaymentsPage() {
               transaction_reference: transactionReference.trim(),
               confirmed_at: new Date().toISOString(),
               notes: notes.trim() || payment.notes,
-              confirmed_by: authService.getCurrentUser()?.id
+              confirmed_by: authService.getCurrentUser()?.userId
             }
             : payment
         )
@@ -228,9 +228,9 @@ export default function PaymentsPage() {
   const getStatusVariant = (status: Payment["payment_status"]) => {
     switch (status) {
       case 'confirmed':
-        return 'success'
+        return 'default'
       case 'pending':
-        return 'warning'
+        return 'secondary'
       case 'failed':
         return 'destructive'
       default:

@@ -1,30 +1,79 @@
-"use client"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/use-auth"
-import { Loader2 } from "lucide-react"
+import { PackageTracker } from "@/components/tracking/package-tracker"
+import { Button } from "@/components/ui/button"
+import { Truck } from "lucide-react"
+import Link from "next/link"
 
 export default function HomePage() {
-  const { isAuthenticated, loading } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!loading) {
-      if (isAuthenticated) {
-        router.push("/dashboard")
-      } else {
-        router.push("/login")
-      }
-    }
-  }, [isAuthenticated, loading, router])
-
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-        <p className="text-muted-foreground">Redirecting...</p>
-      </div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-blue-50/30">
+      {/* Public Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white p-2.5 rounded-lg shadow-sm">
+                <Truck className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="font-bold text-xl text-gray-900">KIVU Belt Express</h1>
+                <p className="text-sm text-gray-500 -mt-0.5">Reliable Logistics Solutions</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/track">
+                <Button variant="ghost" className="text-gray-600 hover:text-gray-900">
+                  Track Package
+                </Button>
+              </Link>
+              <Link href="/login">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Login
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto">
+          <PackageTracker />
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 absolute bottom-0 w-full">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center gap-2 mb-4 md:mb-0">
+              <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white p-1.5 rounded">
+                <Truck className="h-4 w-4" />
+              </div>
+              <span className="font-semibold text-gray-900">KIVU Belt Express</span>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
+              <Link href="/privacy" className="hover:text-blue-600 transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="hover:text-blue-600 transition-colors">
+                Terms of Service
+              </Link>
+              <Link href="/support" className="hover:text-blue-600 transition-colors">
+                Support
+              </Link>
+              <Link href="/contact" className="hover:text-blue-600 transition-colors">
+                Contact
+              </Link>
+            </div>
+
+            <div className="mt-4 md:mt-0 text-xs text-gray-500">
+              © {new Date().getFullYear()} KIVU Belt Express. All rights reserved.
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

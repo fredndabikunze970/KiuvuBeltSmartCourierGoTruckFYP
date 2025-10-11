@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase-client';
 import { ref, onValue, off } from 'firebase/database';
+import { componentColors } from '@/lib/colors';
 
 // Dynamically import the enhanced map component
 const EnhancedRealTimeTrackingMap = dynamic(
@@ -14,10 +15,10 @@ const EnhancedRealTimeTrackingMap = dynamic(
     {
         ssr: false,
         loading: () => (
-            <div className="h-96 bg-slate-100 rounded-lg flex items-center justify-center">
+            <div className="h-96 bg-gray-50 rounded-lg flex items-center justify-center">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <p className="text-sm text-slate-600">Loading advanced tracking...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-600">Loading advanced tracking...</p>
                 </div>
             </div>
         )
@@ -395,7 +396,7 @@ function Car001History({ locationHistory }: { locationHistory: any }) {
 
     const getSpeedColor = (speed: number) => {
         if (speed < 10) return 'text-green-600 bg-green-50';
-        if (speed < 30) return 'text-yellow-600 bg-yellow-50';
+        if (speed < 30) return 'text-amber-600 bg-amber-50';
         return 'text-red-600 bg-red-50';
     };
 
@@ -409,13 +410,13 @@ function Car001History({ locationHistory }: { locationHistory: any }) {
         return (
             <div className="flex flex-col items-center justify-center py-12">
                 <div className="relative mb-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-600">🚗</div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-500">🚗</div>
                 </div>
-                <p className="text-sm font-medium text-slate-700 mb-2">Loading CAR001 History</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">Loading CAR001 History</p>
                 {geocodingProgress > 0 && (
                     <div className="w-48">
-                        <Progress value={geocodingProgress} className="h-1 bg-slate-200 [&>div]:bg-blue-500" />
+                    <Progress value={geocodingProgress} className="h-1 bg-gray-200 [&>div]:bg-blue-500" />
                         <p className="text-xs text-slate-500 mt-1 text-center">
                             Geocoding... {Math.round(geocodingProgress)}%
                         </p>
@@ -501,7 +502,7 @@ function Car001History({ locationHistory }: { locationHistory: any }) {
                         <span className="text-sm font-medium text-blue-700">Processing Locations</span>
                         <span className="text-sm text-blue-600">{Math.round(geocodingProgress)}%</span>
                     </div>
-                    <Progress value={geocodingProgress} className="h-2 bg-blue-100 [&>div]:bg-blue-500" />
+                    <Progress value={geocodingProgress} className="h-2 bg-blue-50 [&>div]:bg-blue-500" />
                 </div>
             )}
 
@@ -568,10 +569,10 @@ function Car001History({ locationHistory }: { locationHistory: any }) {
 
                                 {/* Address */}
                                 <div className="lg:col-span-2">
-                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                                    <div className="bg-gradient-to-r from-blue-50 to-blue-50 rounded-lg p-3 border border-blue-200">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <div className="text-indigo-500">🗺️</div>
-                                            <span className="text-xs font-semibold text-indigo-700">LOCATION</span>
+                                            <div className="text-blue-500">🗺️</div>
+                                            <span className="text-xs font-semibold text-blue-700">LOCATION</span>
                                             {point.isGeocoded && (
                                                 <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
                                                     Verified
@@ -644,10 +645,10 @@ function Car001History({ locationHistory }: { locationHistory: any }) {
                         <p className="text-xs text-slate-500">Moving</p>
                     </div>
                     <div>
-                        <p className="text-2xl font-bold text-purple-600">
+                        <p className="text-2xl font-bold text-blue-600">
                             {new Set(car001History.map(p => formatRwandaDate(p.timestamp))).size}
                         </p>
-                        <p className="text-xs text-slate-500">Active Days</p>
+                        <p className="text-xs text-gray-500">Active Days</p>
                     </div>
                 </div>
             </div>
@@ -788,8 +789,8 @@ function DashboardVehicleHistory({ locationHistory }: { locationHistory: any }) 
                 >
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                                <span className="text-xs font-bold text-blue-600">{index + 1}</span>
+                            <div className="w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-100 transition-colors">
+                                <span className="text-xs font-bold text-blue-500">{index + 1}</span>
                             </div>
                             <div>
                                 <p className="text-xs font-semibold text-slate-700">
@@ -970,11 +971,11 @@ export function EnhancedDashboardNew() {
             case 'in_transit':
                 return 'bg-blue-100 text-blue-800 border border-blue-200';
             case 'out_for_delivery':
-                return 'bg-purple-100 text-purple-800 border border-purple-200';
+                return 'bg-blue-100 text-blue-800 border border-blue-200';
             case 'registered':
                 return 'bg-amber-100 text-amber-800 border border-amber-200';
             default:
-                return 'bg-slate-100 text-slate-800 border border-slate-200';
+                return 'bg-gray-100 text-gray-800 border border-gray-200';
         }
     };
 
@@ -987,26 +988,26 @@ export function EnhancedDashboardNew() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 p-6">
             {/* Header Section */}
             <div className="mb-8">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Delivery Dashboard</h1>
-                        <p className="text-slate-600 mt-2">Real-time overview of your delivery operations and fleet</p>
+                        <h1 className="text-3xl font-bold text-gray-800">Delivery Dashboard</h1>
+                        <p className="text-gray-600 mt-2">Real-time overview of your delivery operations and fleet</p>
                     </div>
                     <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                             <span className="text-sm font-medium text-green-600">Live</span>
                         </div>
-                        <div className="text-sm text-slate-500">
+                        <div className="text-sm text-gray-500">
                             Updated {formatRwandaTime(lastUpdated)}
                         </div>
                         <button
                             onClick={fetchDashboardStats}
                             disabled={refreshing}
-                            className="flex items-center space-x-2 text-sm text-slate-600 hover:text-slate-800 disabled:opacity-50 transition-colors"
+                            className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 transition-colors"
                         >
                             <div className={`${refreshing ? 'animate-spin' : ''}`}>🔄</div>
                             <span>Refresh</span>
@@ -1018,23 +1019,23 @@ export function EnhancedDashboardNew() {
             {/* Key Metrics Grid */}
             <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-4">
                 {/* Total Packages */}
-                <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-semibold text-slate-600">Total Packages</CardTitle>
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <div className="text-blue-600">📦</div>
+                        <CardTitle className="text-sm font-semibold text-gray-600">Total Packages</CardTitle>
+                        <div className="p-2 bg-blue-50 rounded-lg">
+                            <div className="text-blue-500">📦</div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-slate-800">{stats.packageStats.total_packages}</div>
+                        <div className="text-3xl font-bold text-gray-800">{stats.packageStats.total_packages}</div>
                         <div className="flex items-center space-x-2 mt-2">
-                            <div className="w-full bg-slate-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                                     style={{ width: `${(stats.packageStats.in_transit / stats.packageStats.total_packages) * 100}%` }}
                                 ></div>
                             </div>
-                            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
                                 {stats.packageStats.in_transit} in transit
                             </span>
                         </div>
@@ -1042,23 +1043,23 @@ export function EnhancedDashboardNew() {
                 </Card>
 
                 {/* Fleet Status */}
-                <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-semibold text-slate-600">Active Fleet</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-gray-600">Active Fleet</CardTitle>
                         <div className="p-2 bg-green-100 rounded-lg">
                             <div className="text-green-600">🚚</div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-slate-800">{stats.fleetStats.active_vehicles}</div>
+                        <div className="text-3xl font-bold text-gray-800">{stats.fleetStats.active_vehicles}</div>
                         <div className="flex items-center space-x-2 mt-2">
-                            <div className="w-full bg-slate-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     className="bg-green-600 h-2 rounded-full transition-all duration-500"
                                     style={{ width: `${fleetUtilization}%` }}
                                 ></div>
                             </div>
-                            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
                                 of {stats.fleetStats.total_vehicles}
                             </span>
                         </div>
@@ -1066,18 +1067,18 @@ export function EnhancedDashboardNew() {
                 </Card>
 
                 {/* Delivered Packages */}
-                <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-semibold text-slate-600">Delivered</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-gray-600">Delivered</CardTitle>
                         <div className="p-2 bg-green-100 rounded-lg">
                             <div className="text-green-600">✅</div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-slate-800">{stats.packageStats.delivered}</div>
+                        <div className="text-3xl font-bold text-gray-800">{stats.packageStats.delivered}</div>
                         <div className="flex items-center space-x-2 mt-2">
-                            <Progress value={deliveryProgress} className="h-2 bg-slate-200 [&>div]:bg-green-500" />
-                            <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                            <Progress value={deliveryProgress} className="h-2 bg-gray-200 [&>div]:bg-green-500" />
+                            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
                                 {Math.round(deliveryProgress)}%
                             </span>
                         </div>
@@ -1085,18 +1086,18 @@ export function EnhancedDashboardNew() {
                 </Card>
 
                 {/* Revenue */}
-                <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-semibold text-slate-600">Total Revenue</CardTitle>
-                        <div className="p-2 bg-emerald-100 rounded-lg">
-                            <div className="text-emerald-600">💰</div>
+                        <CardTitle className="text-sm font-semibold text-gray-600">Total Revenue</CardTitle>
+                        <div className="p-2 bg-green-100 rounded-lg">
+                            <div className="text-green-600">💰</div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-slate-800">
+                        <div className="text-2xl font-bold text-gray-800">
                             {formatCurrency(Number(stats.paymentStats.total_amount) || 0)}
                         </div>
-                        <p className="text-xs text-slate-500 mt-2">
+                        <p className="text-xs text-gray-500 mt-2">
                             {stats.paymentStats.confirmed_payments} confirmed payments
                         </p>
                     </CardContent>
@@ -1111,9 +1112,9 @@ export function EnhancedDashboardNew() {
                 {/* Four Column Layout for Additional Data */}
                 <div className="grid gap-6 lg:grid-cols-4">
                     {/* Payment Statistics */}
-                    <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm lg:col-span-1">
+                    <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm lg:col-span-1">
                         <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center space-x-2 text-slate-800">
+                            <CardTitle className="flex items-center space-x-2 text-gray-800">
                                 <div className="text-green-600">💰</div>
                                 <span className="text-sm">Payment Overview</span>
                             </CardTitle>
@@ -1121,12 +1122,12 @@ export function EnhancedDashboardNew() {
                         <CardContent className="space-y-4">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-slate-600">Total Payments</span>
-                                    <span className="font-bold text-slate-800 text-sm">{stats.paymentStats.total_payments}</span>
+                                    <span className="text-xs font-medium text-gray-600">Total Payments</span>
+                                    <span className="font-bold text-gray-800 text-sm">{stats.paymentStats.total_payments}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-slate-600">Total Amount</span>
-                                    <span className="font-bold text-slate-800 text-sm">
+                                    <span className="text-xs font-medium text-gray-600">Total Amount</span>
+                                    <span className="font-bold text-gray-800 text-sm">
                                         {formatCurrency(Number(stats.paymentStats.total_amount) || 0)}
                                     </span>
                                 </div>
@@ -1134,16 +1135,16 @@ export function EnhancedDashboardNew() {
 
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="text-slate-600">Success Rate</span>
+                                    <span className="text-gray-600">Success Rate</span>
                                     <span className="font-medium text-green-600">
                                         {stats.paymentStats.confirmed_payments}/{stats.paymentStats.total_payments}
                                     </span>
                                 </div>
                                 <Progress
                                     value={paymentProgress}
-                                    className="h-2 bg-slate-200 [&>div]:bg-green-500"
+                                    className="h-2 bg-gray-200 [&>div]:bg-green-500"
                                 />
-                                <div className="flex justify-between text-xs text-slate-500">
+                                <div className="flex justify-between text-xs text-gray-500">
                                     <span>Pending: {stats.paymentStats.pending_payments}</span>
                                     <span>Confirmed: {stats.paymentStats.confirmed_payments}</span>
                                 </div>
@@ -1209,10 +1210,10 @@ export function EnhancedDashboardNew() {
                 {/* Other Vehicles History */}
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* Vehicle Location History */}
-                    <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm">
+                    <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm">
                         <CardHeader className="pb-4">
-                            <CardTitle className="flex items-center space-x-2 text-slate-800">
-                                <div className="text-purple-600">📜</div>
+                            <CardTitle className="flex items-center space-x-2 text-gray-900">
+                                <div className="text-amber-600">📜</div>
                                 <span>Other Vehicles History</span>
                             </CardTitle>
                         </CardHeader>

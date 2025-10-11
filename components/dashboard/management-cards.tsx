@@ -35,7 +35,7 @@ export async function ManagementCards() {
         value={`${activeDrivers}/${totalDrivers}`}
         description="Active drivers"
         icon={<Users className="h-4 w-4" />}
-        className="bg-purple-50"
+        className="bg-blue-50"
       />
     </div>
   )

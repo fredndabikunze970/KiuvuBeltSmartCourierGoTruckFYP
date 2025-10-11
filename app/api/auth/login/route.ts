@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
         full_name: user.full_name,
         role: user.role === "receiver" ? "customer" : user.role, // Map receiver role to customer
         phone: user.phone,
+        branch_id: user.branch_id,
       },
     })
   } catch (error) {

@@ -108,11 +108,11 @@ export async function POST(request: NextRequest) {
             let realProgress = 0
             try {
               console.log('USSD: Fetching real progress from tracking API for:', trackingNumber)
-              // Use direct localhost URL to avoid routing issues
-              const trackingApiUrl = `http://localhost:3000/api/tracking/${trackingNumber}`
+              // Use relative URL for internal API calls (works in both dev and production)
+              const trackingApiUrl = `/api/tracking/${trackingNumber}`
               console.log('USSD: Calling tracking API URL:', trackingApiUrl)
 
-              const trackingResponse = await fetch(trackingApiUrl, {
+              const trackingResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${trackingApiUrl}`, {
                 method: 'GET',
                 headers: {
                   'Content-Type': 'application/json'

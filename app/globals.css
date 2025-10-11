@@ -5,40 +5,40 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match KIVU Belt Express professional design brief */
+  /* Professional KIVU Belt Express Color System */
   --background: #ffffff;
-  --foreground: #374151;
-  --card: #f0fdf4;
-  --card-foreground: #374151;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
   --popover: #ffffff;
-  --popover-foreground: #374151;
-  --primary: #15803d;
+  --popover-foreground: #1e293b;
+  --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #84cc16;
-  --secondary-foreground: #374151;
-  --muted: #f0fdf4;
-  --muted-foreground: #374151;
-  --accent: #15803d;
+  --secondary: #22c55e;
+  --secondary-foreground: #ffffff;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #f59e0b;
   --accent-foreground: #ffffff;
-  --destructive: #d97706;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #d1d5db;
-  --input: #f0fdf4;
-  --ring: rgba(21, 128, 61, 0.2);
-  --chart-1: #84cc16;
-  --chart-2: #15803d;
-  --chart-3: #d97706;
-  --chart-4: #f0fdf4;
-  --chart-5: #374151;
+  --border: #e2e8f0;
+  --input: #ffffff;
+  --ring: rgba(59, 130, 246, 0.2);
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #ef4444;
+  --chart-5: #64748b;
   --radius: 0.5rem;
-  --sidebar: #f0fdf4;
-  --sidebar-foreground: #374151;
-  --sidebar-primary: #15803d;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #84cc16;
-  --sidebar-accent-foreground: #374151;
-  --sidebar-border: #d1d5db;
-  --sidebar-ring: rgba(21, 128, 61, 0.2);
+  --sidebar-accent: #e2e8f0;
+  --sidebar-accent-foreground: #1e293b;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: rgba(59, 130, 246, 0.2);
 }
 
 .dark {
