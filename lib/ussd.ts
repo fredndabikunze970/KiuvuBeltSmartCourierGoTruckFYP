@@ -25,16 +25,20 @@ export const USSD_STATES = {
 } as const
 
 /**
- * Generate a simple progress bar for USSD display
+ * Generate an enhanced progress bar for USSD display with percentage markers
+ * Example output for 40%: [▉▉▉▉░░░░░░] 40%
  */
 export function generateProgressBar(progress: number, length: number = 10): string {
-  const filledBars = Math.round((progress / 100) * length)
+  // Ensure progress is between 0 and 100
+  const normalizedProgress = Math.max(0, Math.min(100, progress))
+  const filledBars = Math.round((normalizedProgress / 100) * length)
   const emptyBars = length - filledBars
 
-  const filled = '█'.repeat(filledBars)
+  // Using different Unicode block characters for better visibility
+  const filled = '▉'.repeat(filledBars)
   const empty = '░'.repeat(emptyBars)
 
-  return `[${filled}${empty}]`
+  return `[${filled}${empty}] ${normalizedProgress.toFixed(0)}%`
 }
 
 /**
@@ -95,7 +99,22 @@ export function formatTrackingResponse(trackingData: any): USSDResponse {
     const locationInfo = formatLocationForUSSD(currentLocation)
     const progressBar = generateProgressBar(progress)
 
-    const responseText = `END Package Status: ${statusText}\n\nTracking: ${packageInfo.package_id}\nProgress: ${progress.toFixed(1)}%\n${progressBar}\n\nCurrent Location:\n${locationInfo}\n\nFrom: ${packageInfo.origin_branch_name || 'Origin'}\nTo: ${packageInfo.destination_branch_name || 'Destination'}\n\nSender: ${packageInfo.sender_name}\nReceiver: ${packageInfo.receiver_name}\n\nThank you for using KIVU Belt Express!`
+    const responseText = `END Package Status: ${statusText}
+Tracking: ${packageInfo.package_id}
+
+Progress: ${progressBar}
+
+Location:
+${locationInfo}
+
+Route:
+From: ${packageInfo.origin_branch_name || 'Origin'}
+To: ${packageInfo.destination_branch_name || 'Destination'}
+
+Sender: ${packageInfo.sender_name}
+Receiver: ${packageInfo.receiver_name}
+
+Thank you for using KIVU Belt Express!`
 
     return {
       response: responseText,

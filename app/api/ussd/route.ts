@@ -1,14 +1,12 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 import {
   type USSDRequest,
   type USSDResponse,
-  USSD_STATES,
-  validateTrackingNumber,
-  formatTrackingResponse,
   formatStatusForUSSD,
-  generateProgressBar
+  generateProgressBar,
+  validateTrackingNumber
 } from "@/lib/ussd"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
@@ -125,18 +123,26 @@ export async function POST(request: NextRequest) {
                 const trackingData = await trackingResponse.json()
                 console.log('USSD: Full tracking API response:', JSON.stringify(trackingData, null, 2))
 
-                // Try different possible field names for progress
-                if (trackingData.progress !== undefined) {
-                  realProgress = trackingData.progress
-                  console.log('USSD: Real progress from API (progress field):', realProgress)
-                } else if (trackingData.percentage !== undefined) {
-                  realProgress = trackingData.percentage
-                  console.log('USSD: Real progress from API (percentage field):', realProgress)
-                } else if (trackingData.progress_percentage !== undefined) {
-                  realProgress = trackingData.progress_percentage
-                  console.log('USSD: Real progress from API (progress_percentage field):', realProgress)
+                // Always use progress from tracking API response
+                if (trackingData && typeof trackingData.progress === 'number') {
+                  realProgress = Math.min(100, Math.max(0, trackingData.progress))
+                  console.log('USSD: Using progress from tracking API:', realProgress)
+                } else if (trackingData.routeDistance && trackingData.distanceTraveled) {
+                  // Fallback to distance-based calculation if no direct progress
+                  const routeDistance = trackingData.routeDistance  // in meters
+                  const distanceTraveled = trackingData.distanceTraveled  // in meters
+                  realProgress = Math.min(100, Math.max(0, (distanceTraveled / routeDistance) * 100))
+                  console.log('USSD: Calculated progress from distances:', {
+                    routeDistance,
+                    distanceTraveled,
+                    calculatedProgress: realProgress
+                  })
+                } else if (trackingData.status === 'delivered') {
+                  realProgress = 100
+                  console.log('USSD: Package is delivered, setting progress to 100%')
                 } else {
-                  console.log('USSD: No progress data found in tracking API response. Available fields:', Object.keys(trackingData))
+                  console.log('USSD: No progress data found in tracking response:', trackingData)
+                  realProgress = 0
                 }
               } else {
                 console.log('USSD: Tracking API call failed:', trackingResponse.status)
@@ -235,8 +241,25 @@ export async function POST(request: NextRequest) {
             const progress = realProgress
             const progressBar = generateProgressBar(progress)
 
-            // Compose USSD response text
-            const responseText = `END Package Status: ${statusText}\n\nTracking: ${packageData.package_id}\nProgress: ${progress.toFixed(1)}%\n${progressBar}\n\nFrom: ${packageData.origin_branch_name || 'Origin'}\nTo: ${packageData.destination_branch_name || 'Destination'}${currentLocationText}\n\nSender: ${packageData.sender_name}\nReceiver: ${packageData.receiver_name}\n\nThank you for using KIVU Belt Express!`
+            // Format distance info if available
+            let distanceInfo = ''
+            if (packageData.distance) {
+              distanceInfo = `\nTotal Distance: ${(packageData.distance / 1000).toFixed(2)} km`
+            }
+
+            // Compose USSD response text with additional info
+            const responseText = `END Package Status: ${statusText}
+Tracking: ${packageData.package_id}
+
+Progress: ${progressBar}${distanceInfo}
+
+From: ${packageData.origin_branch_name || 'Origin'}
+To: ${packageData.destination_branch_name || 'Destination'}${currentLocationText}
+
+Sender: ${packageData.sender_name}
+Receiver: ${packageData.receiver_name}
+
+Thank you for using KIVU Belt Express!`
 
             response = {
               response: responseText,
