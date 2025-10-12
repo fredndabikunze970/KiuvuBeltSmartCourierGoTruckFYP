@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 import { sendPackageNotification } from "@/lib/sms"
+import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,12 +33,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if package is ready for delivery verification
-    if (pkg.status !== "out_for_delivery") {
-      return NextResponse.json(
-        { error: "Package is not ready for delivery verification" },
-        { status: 400 }
-      )
-    }
+    // if (pkg.status !== "out_for_delivery") {
+    //   return NextResponse.json(
+    //     { error: "Package is not ready for delivery verification" },
+    //     { status: 400 }
+    //   )
+    // }
 
     // Update package status to delivered
     await sql`
@@ -46,6 +46,18 @@ export async function POST(req: NextRequest) {
       SET status = 'delivered', delivered_at = NOW(), updated_at = NOW()
       WHERE package_id = ${packageId}
     `
+
+    // Get system admin user for tracking update
+    const adminUser = await sql`
+      SELECT user_id FROM users WHERE role = 'admin' OR role = 'agent' LIMIT 1
+    `
+
+    if (!adminUser || adminUser.length === 0) {
+      return NextResponse.json(
+        { error: "System admin user not found" },
+        { status: 500 }
+      )
+    }
 
     // Insert tracking entry
     await sql`
@@ -62,7 +74,7 @@ export async function POST(req: NextRequest) {
         'Delivered to recipient',
         100,
         'Package delivered and verified by recipient',
-        'recipient'
+        ${adminUser[0].user_id}
       )
     `
 

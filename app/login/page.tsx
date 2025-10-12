@@ -21,7 +21,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 KIVU Belt Express. All rights reserved.</p>
+          <p>&copy; 2025 KIVU Belt Express. All rights reserved.</p>
         </div>
       </div>
     </div>

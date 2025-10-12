@@ -1,8 +1,8 @@
 import { PackageTracker } from "@/components/tracking/package-tracker"
 import { Button } from "@/components/ui/button"
 import { Truck } from "lucide-react"
-import Link from "next/link"
 import { Metadata } from "next"
+import Link from "next/link"
 
 export const metadata: Metadata = {
   title: "Track Package | KIVU Belt Express",
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function TrackPage() {
   return (
-    <div className="min-h-screen flex flex-col relative bg-gradient-to-br from-gray-50 to-blue-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 pb-20"> {/* Add padding bottom */}
       {/* Public Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -42,14 +42,16 @@ export default function TrackPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <PackageTracker />
+      <main>
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-7xl mx-auto">
+            <PackageTracker />
+          </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 absolute bottom-0 w-full">
+      {/* Footer - Fixed at bottom */}
+      <footer className="bg-white border-t border-gray-200 w-full fixed bottom-0 left-0 right-0">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">

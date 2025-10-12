@@ -108,10 +108,7 @@ export function LoginForm() {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Demo Credentials:</p>
-          <p className="font-mono text-xs mt-1">admin@kivubelt.com / admin123</p>
-        </div>
+        
       </CardContent>
     </Card>
   )
