@@ -156,9 +156,9 @@ export function NotificationCenter() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -221,17 +221,18 @@ export function NotificationCenter() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Notification History</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl sm:text-2xl">Notification History</CardTitle>
+              <CardDescription className="text-sm sm:text-base">
                 Manage and review your system notifications
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={refreshNotifications}
                 disabled={refreshing}
+                className="w-full sm:w-auto"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
@@ -242,18 +243,19 @@ export function NotificationCenter() {
                   variant="outline"
                   size="sm"
                   onClick={markAllAsRead}
+                  className="w-full sm:w-auto"
                 >
                   <CheckCheck className="h-4 w-4 mr-2" />
                   Mark All Read
                 </Button>
               )}
 
-              <div className="flex border rounded-lg">
+              <div className="flex border rounded-lg w-full sm:w-auto">
                 <Button
                   variant={filter === 'all' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setFilter('all')}
-                  className="rounded-r-none"
+                  className="rounded-r-none flex-1"
                 >
                   All
                 </Button>
@@ -261,7 +263,7 @@ export function NotificationCenter() {
                   variant={filter === 'unread' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setFilter('unread')}
-                  className="rounded-l-none"
+                  className="rounded-l-none flex-1"
                 >
                   Unread
                   {unreadCount > 0 && (
@@ -299,24 +301,24 @@ export function NotificationCenter() {
                     ${notification.is_read ? 'bg-white' : 'bg-blue-50 border-blue-200'}
                   `}
                 >
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
                       <div className={`
                         w-2 h-2 rounded-full flex-shrink-0
                         ${notification.is_read ? 'bg-gray-300' : 'bg-blue-500'}
                       `} />
 
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 truncate">
+                        <h4 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                           {notification.title}
                         </h4>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-gray-600 mt-1 sm:mt-0">
                           {notification.message}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
                       <Badge className={getTypeColor(notification.type)}>
                         {notification.type}
                       </Badge>
@@ -326,8 +328,8 @@ export function NotificationCenter() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm text-gray-500 pt-3 border-t border-gray-100 gap-2">
+                    <div className="flex items-center gap-4 flex-wrap">
                       {notification.tracking_number && (
                         <span className="font-mono bg-gray-100 px-2 py-1 rounded">
                           {notification.tracking_number}

@@ -219,15 +219,15 @@ export function UserManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">User Management</h2>
-          <p className="text-muted-foreground">Manage system users and their permissions</p>
+          <h2 className="text-2xl font-bold sm:text-3xl">User Management</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">Manage system users and their permissions</p>
         </div>
         <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -254,6 +254,7 @@ export function UserManagement() {
                   value={editForm.full_name}
                   onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
                   placeholder="Enter full name"
+                  className="w-full"
                 />
               </div>
               <div>
@@ -263,6 +264,7 @@ export function UserManagement() {
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   placeholder="Enter email"
                   type="email"
+                  className="w-full"
                 />
               </div>
               <div>
@@ -271,12 +273,13 @@ export function UserManagement() {
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                   placeholder="Enter phone number"
+                  className="w-full"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium">Role</label>
                 <Select value={editForm.role} onValueChange={(value) => setEditForm({ ...editForm, role: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -289,7 +292,7 @@ export function UserManagement() {
               <div>
                 <label className="text-sm font-medium">Branch</label>
                 <Select value={editForm.branch_id} onValueChange={(value) => setEditForm({ ...editForm, branch_id: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select branch" />
                   </SelectTrigger>
                   <SelectContent>
@@ -302,12 +305,12 @@ export function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setEditingUser(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveEdit}>
+              <div className="flex justify-end space-x-2 flex-col sm:flex-row-reverse gap-2">
+                <Button onClick={handleSaveEdit} className="w-full sm:w-auto">
                   Save Changes
+                </Button>
+                <Button variant="outline" onClick={() => setEditingUser(null)} className="w-full sm:w-auto">
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -318,15 +321,15 @@ export function UserManagement() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
+            <div className="flex-1 min-w-[180px]">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, or user ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 w-full"
                 />
               </div>
             </div>
@@ -363,10 +366,10 @@ export function UserManagement() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[700px] md:min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%]">User Information</TableHead>
+                  <TableHead className="w-[25%]">User Information</TableHead>
                   <TableHead className="w-[15%]">Role</TableHead>
                   <TableHead className="w-[15%]">Branch</TableHead>
                   <TableHead className="w-[15%]">Status</TableHead>
@@ -382,8 +385,8 @@ export function UserManagement() {
                         <p className="font-medium text-base">{user.full_name}</p>
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
-                            <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+                            <path d="M3 4a2 2 0 01-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 01-2-2H3z" />
+                            <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 012 2h14a2 2 0 012-2V8.839z" />
                           </svg>
                           <span>{user.email}</span>
                         </div>

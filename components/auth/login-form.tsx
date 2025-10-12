@@ -35,13 +35,13 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-        <CardDescription className="text-center">Sign in to your KIVU Belt Express account</CardDescription>
+        <CardTitle className="text-2xl font-bold text-center sm:text-3xl">Welcome Back</CardTitle>
+        <CardDescription className="text-center text-sm sm:text-base">Sign in to your KIVU Belt Express account</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -58,7 +58,7 @@ export function LoginForm() {
                 placeholder="agent@kivubelt.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -75,7 +75,7 @@ export function LoginForm() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 w-full"
                 required
                 disabled={loading}
               />

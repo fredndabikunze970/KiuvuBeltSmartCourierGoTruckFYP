@@ -292,21 +292,21 @@ export default function PaymentsPage() {
   return (
     <ProtectedRoute allowedRoles={["admin", "agent"]}>
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Payment Management</h1>
-              <p className="text-gray-600 mt-1">Manage and confirm package payments</p>
+              <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Payment Management</h1>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Manage and confirm package payments</p>
             </div>
-            <Button className="flex items-center gap-2">
+            <Button className="flex items-center gap-2 w-full sm:w-auto">
               <Download className="w-4 h-4" />
               Export Report
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -377,7 +377,7 @@ export default function PaymentsPage() {
           {/* Filters and Search */}
           <Card>
             <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
@@ -387,13 +387,13 @@ export default function PaymentsPage() {
                     className="pl-10 pr-4 py-2 w-full"
                   />
                 </div>
-                <div className="flex gap-3">
-                  <div className="flex items-center gap-2 px-3 py-2 border rounded-md">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 px-3 py-2 border rounded-md w-full sm:w-auto">
                     <Filter className="w-4 h-4 text-gray-400" />
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="bg-transparent border-none outline-none text-sm"
+                      className="bg-transparent border-none outline-none text-sm w-full"
                       aria-label="Filter payments by status"
                       title="Payment status filter"
                     >
@@ -403,7 +403,7 @@ export default function PaymentsPage() {
                       <option value="failed">Failed</option>
                     </select>
                   </div>
-                  <Button variant="outline" onClick={fetchPayments}>
+                  <Button variant="outline" onClick={fetchPayments} className="w-full sm:w-auto">
                     Refresh
                   </Button>
                 </div>
@@ -415,14 +415,14 @@ export default function PaymentsPage() {
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[900px] md:min-w-full">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left p-4 font-medium text-gray-600">Payment Details</th>
-                      <th className="text-left p-4 font-medium text-gray-600">Package & Sender</th>
-                      <th className="text-left p-4 font-medium text-gray-600">Receiver</th>
-                      <th className="text-left p-4 font-medium text-gray-600">Status</th>
-                      <th className="text-left p-4 font-medium text-gray-600">Actions</th>
+                      <th className="text-left p-4 font-medium text-gray-600 w-[20%]">Payment Details</th>
+                      <th className="text-left p-4 font-medium text-gray-600 w-[20%]">Package & Sender</th>
+                      <th className="text-left p-4 font-medium text-gray-600 w-[20%]">Receiver</th>
+                      <th className="text-left p-4 font-medium text-gray-600 w-[15%]">Status</th>
+                      <th className="text-left p-4 font-medium text-gray-600 w-[25%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -512,7 +512,7 @@ export default function PaymentsPage() {
 
               {/* Pagination */}
               {payments.length > 0 && (
-                <div className="flex items-center justify-between p-4 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4">
                   <div className="text-sm text-gray-700">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                     {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
@@ -543,13 +543,13 @@ export default function PaymentsPage() {
 
           {/* Payment Confirmation Modal */}
           <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
                   <CheckCircle className="w-6 h-6 text-green-600" />
                   Confirm Payment
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-sm sm:text-base">
                   Review payment details and select payment method before confirmation.
                 </DialogDescription>
               </DialogHeader>
@@ -558,8 +558,8 @@ export default function PaymentsPage() {
                 <div className="space-y-6">
                   {/* Payment Summary */}
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-lg">Payment Summary</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Payment ID:</span>
                         <p className="font-medium">{selectedPayment.payment_id}</p>
@@ -582,9 +582,9 @@ export default function PaymentsPage() {
                   </div>
 
                   {/* Sender & Receiver Info */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-lg">
                         <User className="w-4 h-4" />
                         Sender
                       </h4>
@@ -594,7 +594,7 @@ export default function PaymentsPage() {
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-lg">
                         <User className="w-4 h-4" />
                         Receiver
                       </h4>
@@ -607,7 +607,7 @@ export default function PaymentsPage() {
 
                   {/* Transaction Reference */}
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Transaction Reference *</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2 text-lg">Transaction Reference *</h4>
                     <Input
                       placeholder="Enter transaction reference number..."
                       value={transactionReference}
@@ -622,8 +622,8 @@ export default function PaymentsPage() {
 
                   {/* Payment Method Selection */}
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Select Payment Method *</h4>
-                    <div className="grid grid-cols-2 gap-3">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-lg">Select Payment Method *</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {paymentMethods.map((method) => {
                         const IconComponent = method.icon
                         return (
@@ -655,7 +655,7 @@ export default function PaymentsPage() {
 
                   {/* Additional Notes */}
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Additional Notes</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2 text-lg">Additional Notes</h4>
                     <textarea
                       placeholder="Add any additional notes or comments about this payment confirmation..."
                       value={notes}
@@ -666,18 +666,19 @@ export default function PaymentsPage() {
                 </div>
               )}
 
-              <DialogFooter className="flex gap-2 sm:gap-0">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={closeConfirmModal}
                   disabled={isConfirming}
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleConfirmPayment}
                   disabled={!selectedPaymentMethod || !transactionReference.trim() || isConfirming}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                 >
                   {isConfirming ? (
                     <>

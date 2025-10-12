@@ -286,18 +286,18 @@ export function PackageRegistrationForm() {
   }
 
   const StepIndicator = () => (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-center justify-between mb-6 space-x-2 sm:space-x-4 overflow-x-auto py-2">
       {steps.map((step, index) => {
         const StepIcon = step.icon
         const isCompleted = currentStep > step.id
         const isCurrent = currentStep === step.id
 
         return (
-          <div key={step.id} className="flex items-center flex-1">
+          <div key={step.id} className="flex items-center flex-1 min-w-max">
             <div className="flex flex-col items-center">
               <div
                 className={`
-                  flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200
+                  flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 shrink-0
                   ${isCompleted
                     ? "bg-green-500 border-green-500 text-white"
                     : isCurrent
@@ -314,7 +314,7 @@ export function PackageRegistrationForm() {
               </div>
               <span
                 className={`
-                  mt-1 text-xs font-medium transition-colors
+                  mt-1 text-xs font-medium transition-colors text-center whitespace-nowrap
                   ${isCompleted || isCurrent ? "text-foreground" : "text-muted-foreground"}
                 `}
               >
@@ -339,13 +339,13 @@ export function PackageRegistrationForm() {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">Sender Information</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Sender Information</h3>
               <p className="text-muted-foreground text-sm mt-1">Enter sender details</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="senderName" className="text-sm font-semibold">
                   Full Name *
@@ -357,7 +357,7 @@ export function PackageRegistrationForm() {
                   placeholder="John Doe"
                   required
                   disabled={loading}
-                  className="h-10"
+                  className="h-10 w-full"
                 />
               </div>
               <div className="space-y-2">
@@ -371,7 +371,7 @@ export function PackageRegistrationForm() {
                     value={formData.senderPhone}
                     onChange={(e) => handleInputChange("senderPhone", e.target.value)}
                     placeholder="+250788123456"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
                   />
@@ -390,7 +390,7 @@ export function PackageRegistrationForm() {
                   value={formData.senderAddress}
                   onChange={(e) => handleInputChange("senderAddress", e.target.value)}
                   placeholder="Street address, city, district"
-                  className="pl-9 min-h-[80px]"
+                  className="pl-9 min-h-[80px] w-full"
                   required
                   disabled={loading}
                 />
@@ -401,13 +401,13 @@ export function PackageRegistrationForm() {
 
       case 2:
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">Receiver Information</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Receiver Information</h3>
               <p className="text-muted-foreground text-sm mt-1">Enter recipient details</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="receiverName" className="text-sm font-semibold">
                   Full Name *
@@ -419,7 +419,7 @@ export function PackageRegistrationForm() {
                   placeholder="Jane Smith"
                   required
                   disabled={loading}
-                  className="h-10"
+                  className="h-10 w-full"
                 />
               </div>
               <div className="space-y-2">
@@ -433,7 +433,7 @@ export function PackageRegistrationForm() {
                     value={formData.receiverPhone}
                     onChange={(e) => handleInputChange("receiverPhone", e.target.value)}
                     placeholder="+250788654321"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
                   />
@@ -452,7 +452,7 @@ export function PackageRegistrationForm() {
                   value={formData.receiverAddress}
                   onChange={(e) => handleInputChange("receiverAddress", e.target.value)}
                   placeholder="Street address, city, district"
-                  className="pl-9 min-h-[80px]"
+                  className="pl-9 min-h-[80px] w-full"
                   required
                   disabled={loading}
                 />
@@ -463,9 +463,9 @@ export function PackageRegistrationForm() {
 
       case 3:
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">Package Details</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Package Details</h3>
               <p className="text-muted-foreground text-sm mt-1">Describe package contents</p>
             </div>
 
@@ -478,13 +478,13 @@ export function PackageRegistrationForm() {
                 value={formData.packageDescription}
                 onChange={(e) => handleInputChange("packageDescription", e.target.value)}
                 placeholder="Brief description of package contents"
-                className="min-h-[80px]"
+                className="min-h-[80px] w-full"
                 required
                 disabled={loading}
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="weight" className="text-sm font-semibold">
                   Weight (kg) *
@@ -498,7 +498,7 @@ export function PackageRegistrationForm() {
                     value={formData.weight}
                     onChange={(e) => handleInputChange("weight", e.target.value)}
                     placeholder="2.5"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
                   />
@@ -515,7 +515,7 @@ export function PackageRegistrationForm() {
                     value={formData.dimensions}
                     onChange={(e) => handleInputChange("dimensions", e.target.value)}
                     placeholder="30x20x10 cm"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     disabled={loading}
                   />
                 </div>
@@ -532,7 +532,7 @@ export function PackageRegistrationForm() {
                     value={formData.declaredValue}
                     onChange={(e) => handleInputChange("declaredValue", e.target.value)}
                     placeholder="50000"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     disabled={loading}
                   />
                 </div>
@@ -543,19 +543,19 @@ export function PackageRegistrationForm() {
 
       case 4:
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">Delivery Options</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Delivery Options</h3>
               <p className="text-muted-foreground text-sm mt-1">Choose delivery preferences</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="originBranchId" className="text-sm font-semibold flex items-center">
                   Origin Branch <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Select value={formData.originBranchId} onValueChange={(value) => handleInputChange("originBranchId", value)}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select origin branch" />
                   </SelectTrigger>
                   <SelectContent>
@@ -572,7 +572,7 @@ export function PackageRegistrationForm() {
                   Destination Branch <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Select value={formData.destinationBranchId} onValueChange={(value) => handleInputChange("destinationBranchId", value)}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select destination branch" />
                   </SelectTrigger>
                   <SelectContent>
@@ -586,13 +586,13 @@ export function PackageRegistrationForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="assignedCarId" className="text-sm font-semibold">
                   Assign Vehicle <span className="text-gray-500 text-xs">(Optional)</span>
                 </Label>
                 <Select value={formData.assignedCarId} onValueChange={(value) => handleInputChange("assignedCarId", value)}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select vehicle" />
                   </SelectTrigger>
                   <SelectContent>
@@ -609,7 +609,7 @@ export function PackageRegistrationForm() {
                   Assign Driver <span className="text-gray-500 text-xs">(Optional)</span>
                 </Label>
                 <Select value={formData.assignedDriverId} onValueChange={(value) => handleInputChange("assignedDriverId", value)}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select driver" />
                   </SelectTrigger>
                   <SelectContent>
@@ -623,13 +623,13 @@ export function PackageRegistrationForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="priority" className="text-sm font-semibold flex items-center">
                   Delivery Priority <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -666,7 +666,7 @@ export function PackageRegistrationForm() {
                     value={formData.deliveryFee}
                     onChange={(e) => handleInputChange("deliveryFee", e.target.value)}
                     placeholder="5000"
-                    className="pl-9 h-10"
+                    className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
                   />
@@ -674,7 +674,7 @@ export function PackageRegistrationForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="deliveryTime" className="text-sm font-semibold flex items-center">
                   Delivery Time <span className="text-red-500 ml-1">*</span>
@@ -684,7 +684,7 @@ export function PackageRegistrationForm() {
                   type="datetime-local"
                   value={formData.deliveryTime}
                   onChange={(e) => handleInputChange("deliveryTime", e.target.value)}
-                  className="h-10"
+                  className="h-10 w-full"
                   required
                   disabled={loading}
                 />
@@ -702,13 +702,13 @@ export function PackageRegistrationForm() {
 
       case 5:
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">Review & Confirm</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Review & Confirm</h3>
               <p className="text-muted-foreground text-sm mt-1">Verify all information before submitting</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <Card className="bg-blue-50/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -736,36 +736,36 @@ export function PackageRegistrationForm() {
                   <div><strong>Address:</strong> {formData.receiverAddress}</div>
                 </CardContent>
               </Card>
+
+              <Card className="bg-purple-50/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4 text-purple-600" />
+                    Package
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm">
+                  <div><strong>Description:</strong> {formData.packageDescription}</div>
+                  <div><strong>Weight:</strong> {formData.weight} kg</div>
+                  <div><strong>Dimensions:</strong> {formData.dimensions || "Not specified"}</div>
+                  <div><strong>Value:</strong> {formData.declaredValue ? `RWF ${formData.declaredValue}` : "Not specified"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-orange-50/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                    Delivery
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm">
+                  <div><strong>Priority:</strong> <span className="capitalize">{formData.priority}</span></div>
+                  <div><strong>Fee:</strong> RWF {formData.deliveryFee}</div>
+                  <div><strong>Delivery Time:</strong> {formData.deliveryTime ? new Date(formData.deliveryTime).toLocaleString() : "Not specified"}</div>
+                </CardContent>
+              </Card>
             </div>
-
-            <Card className="bg-purple-50/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4 text-purple-600" />
-                  Package
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <div><strong>Description:</strong> {formData.packageDescription}</div>
-                <div><strong>Weight:</strong> {formData.weight} kg</div>
-                <div><strong>Dimensions:</strong> {formData.dimensions || "Not specified"}</div>
-                <div><strong>Value:</strong> {formData.declaredValue ? `RWF ${formData.declaredValue}` : "Not specified"}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-orange-50/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-orange-600" />
-                  Delivery
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <div><strong>Priority:</strong> <span className="capitalize">{formData.priority}</span></div>
-                <div><strong>Fee:</strong> RWF {formData.deliveryFee}</div>
-                <div><strong>Delivery Time:</strong> {formData.deliveryTime ? new Date(formData.deliveryTime).toLocaleString() : "Not specified"}</div>
-              </CardContent>
-            </Card>
 
             {error && (
               <Alert variant="destructive" className="py-3">
@@ -781,34 +781,34 @@ export function PackageRegistrationForm() {
   }
 
   return (
-    <Card className="w-full max-w-7xl mx-auto my-6">
+    <Card className="w-full max-w-7xl mx-auto my-6 sm:my-8 lg:my-10">
       <CardHeader className="text-center pb-4">
         <div className="flex items-center justify-center mb-3">
           <div className="p-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white">
             <Package className="h-6 w-6" />
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-3xl lg:text-4xl">
           Package Registration
         </CardTitle>
-        <CardDescription className="text-base text-muted-foreground">
+        <CardDescription className="text-base text-muted-foreground sm:text-lg">
           Complete the steps to register your package
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-4 pb-6 sm:px-6">
         <StepIndicator />
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
           {renderStepContent()}
 
-          <div className="flex justify-between pt-4 border-t">
+          <div className="flex justify-between pt-4 border-t flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1 || loading}
-              className="h-10 px-5"
+              className="h-10 px-5 flex-1 sm:flex-none"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
@@ -819,7 +819,7 @@ export function PackageRegistrationForm() {
                 type="button"
                 onClick={nextStep}
                 disabled={!validateStep(currentStep) || loading}
-                className="h-10 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="h-10 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex-1 sm:flex-none"
               >
                 Continue
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -828,7 +828,7 @@ export function PackageRegistrationForm() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-10 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                className="h-10 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-1 sm:flex-none"
               >
                 {loading ? (
                   <>

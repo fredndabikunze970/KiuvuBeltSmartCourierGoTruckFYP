@@ -111,13 +111,13 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Create New User</CardTitle>
-        <CardDescription className="text-center">Add a new agent, admin, or customer account</CardDescription>
+        <CardTitle className="text-2xl font-bold text-center sm:text-3xl">Create New User</CardTitle>
+        <CardDescription className="text-center text-sm sm:text-base">Add a new agent, admin, or customer account</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -134,7 +134,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
                 placeholder="John Doe"
                 value={formData.fullName}
                 onChange={(e) => handleInputChange("fullName", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -151,7 +151,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
                 placeholder="john@kivubelt.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -168,7 +168,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
                 placeholder="+250788123456"
                 value={formData.phone}
                 onChange={(e) => handleInputChange("phone", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -178,7 +178,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
             <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value as "agent" | "admin" | "receiver")}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
@@ -194,7 +194,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
             <div className="relative">
               <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Select value={formData.branch_id} onValueChange={(value) => handleInputChange("branch_id", value)} disabled={loading}>
-                <SelectTrigger className="pl-10">
+                <SelectTrigger className="pl-10 w-full">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,7 +219,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
                 placeholder="Create a password"
                 value={formData.password}
                 onChange={(e) => handleInputChange("password", e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 w-full"
                 required
                 disabled={loading}
               />
@@ -250,7 +250,7 @@ export function AdminUserForm({ branches }: AdminUserFormProps) {
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />

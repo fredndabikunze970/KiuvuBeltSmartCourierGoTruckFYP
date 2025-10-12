@@ -138,28 +138,28 @@ export function EnhancedDashboard() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto py-8 space-y-8 sm:px-4 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">Dashboard Overview</h1>
-        <p className="text-muted-foreground">Real-time insights into your courier operations across Rwanda</p>
+      <div className="flex flex-col space-y-2 sm:space-y-3">
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl lg:text-5xl">Dashboard Overview</h1>
+        <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">Real-time insights into your courier operations across Rwanda</p>
       </div>
 
       {/* Stats Cards */}
       <StatsCards stats={dashboardData.stats} />
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
         {/* Real-time Map */}
         <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
               <MapPin className="h-5 w-5 text-primary" />
               Live Package Tracking
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80 rounded-lg overflow-hidden">
+            <div className="h-80 rounded-lg overflow-hidden md:h-96 lg:h-[400px]">
               <LeafletMap
                 center={[-1.9441, 30.0619]} // Kigali center
                 zoom={10}
@@ -167,7 +167,7 @@ export function EnhancedDashboard() {
                 className="w-full h-full"
               />
             </div>
-            <div className="mt-4 flex items-center justify-between text-sm">
+            <div className="mt-4 flex flex-wrap items-center justify-between text-sm gap-2">
               <span className="text-muted-foreground">{dashboardData.stats.inTransit} packages in transit</span>
               <Badge variant="secondary" className="bg-secondary/10 text-secondary">
                 {dashboardData.activeRoutes} active routes
@@ -177,11 +177,11 @@ export function EnhancedDashboard() {
         </Card>
 
         {/* Performance Metrics */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:space-y-8">
           {/* Delivery Rate */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 Delivery Performance
               </CardTitle>
@@ -217,23 +217,23 @@ export function EnhancedDashboard() {
           {/* Quick Actions */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                 <Clock className="h-5 w-5 text-primary" />
                 Quick Actions
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                <Button className="w-full justify-start bg-transparent hover:bg-muted/50" variant="outline">
                   <Package className="mr-2 h-4 w-4" />
                   Register New Package
                 </Button>
-                <Button className="w-full justify-start bg-transparent" variant="outline">
+                <Button className="w-full justify-start bg-transparent hover:bg-muted/50" variant="outline">
                   <Truck className="mr-2 h-4 w-4" />
                   Track Package
                 </Button>
                 {user?.role === "admin" && (
-                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                  <Button className="w-full justify-start bg-transparent hover:bg-muted/50" variant="outline">
                     <Users className="mr-2 h-4 w-4" />
                     Manage Users
                   </Button>
@@ -247,13 +247,13 @@ export function EnhancedDashboard() {
       {/* Recent Activity */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <CardTitle>Recent Package Activity</CardTitle>
+          <CardTitle className="text-xl font-semibold">Recent Package Activity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {dashboardData.recentPackages.map((pkg) => (
-              <div key={pkg.id} className="flex items-center justify-between p-4 rounded-lg bg-card">
-                <div className="flex items-center gap-4">
+              <div key={pkg.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg bg-card/50 border border-border/50 shadow-sm">
+                <div className="flex items-center gap-4 mb-2 sm:mb-0">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Package className="h-4 w-4 text-primary" />
                   </div>
@@ -262,7 +262,7 @@ export function EnhancedDashboard() {
                     <p className="text-sm text-muted-foreground">To: {pkg.receiver_name}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <Badge
                     variant="secondary"
                     className={
@@ -275,7 +275,7 @@ export function EnhancedDashboard() {
                   >
                     {pkg.status.replace("_", " ")}
                   </Badge>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto">
                     View Details
                   </Button>
                 </div>

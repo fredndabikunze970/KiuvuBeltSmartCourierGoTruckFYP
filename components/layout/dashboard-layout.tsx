@@ -267,9 +267,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const ProfessionalFooter = React.memo(function ProfessionalFooter() {
     return (
-    <footer className="bg-white border-t border-gray-200 mt-auto">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex flex-col md:flex-row justify-between items-center">
+    <footer className="bg-white border-t border-gray-200 mt-auto p-4 sm:p-6">
+      <div className="container mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
           <div className="flex items-center gap-2 mb-4 md:mb-0">
             <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white p-1.5 rounded">
               <Truck className="h-4 w-4" />
@@ -277,7 +277,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="font-semibold text-gray-900">KIVU Belt Express</span>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600 mb-4 md:mb-0">
             <Link href="/privacy" className="hover:text-blue-600 transition-colors">
               Privacy Policy
             </Link>
@@ -340,7 +340,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content area */}
       <div className="flex-1 flex flex-col lg:ml-64 min-h-0">
         {/* Header */}
-        <header className="h-16 border-b bg-white sticky top-0 z-30 flex items-center px-6 shrink-0 shadow-sm">
+        <header className="h-16 border-b bg-white sticky top-0 z-30 flex items-center px-4 sm:px-6 shrink-0 shadow-sm">
           <div className="flex-1 flex items-center gap-4">
             <div className="lg:hidden">
               <Button
@@ -354,10 +354,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
                 {navItems.flatMap(section => section.items).find(item => item.href === pathname)?.label || "Dashboard"}
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 hidden sm:block">
                 Welcome back, {isLoading ? "Loading..." : currentUser?.full_name || 'User'}
               </p>
             </div>
@@ -380,7 +380,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto bg-gray-50/50">
-          <div className="container mx-auto p-6">
+          <div className="container mx-auto p-4 sm:p-6 lg:p-8">
             {children}
           </div>
         </main>

@@ -69,13 +69,13 @@ export function RegisterForm() {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
-        <CardDescription className="text-center">Join the KIVU Belt Express team</CardDescription>
+        <CardTitle className="text-2xl font-bold text-center sm:text-3xl">Create Account</CardTitle>
+        <CardDescription className="text-center text-sm sm:text-base">Join the KIVU Belt Express team</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -92,7 +92,7 @@ export function RegisterForm() {
                 placeholder="John Doe"
                 value={formData.fullName}
                 onChange={(e) => handleInputChange("fullName", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -109,7 +109,7 @@ export function RegisterForm() {
                 placeholder="john@kivubelt.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -126,7 +126,7 @@ export function RegisterForm() {
                 placeholder="+250788123456"
                 value={formData.phone}
                 onChange={(e) => handleInputChange("phone", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />
@@ -136,7 +136,7 @@ export function RegisterForm() {
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
             <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select your role" />
               </SelectTrigger>
               <SelectContent>
@@ -156,7 +156,7 @@ export function RegisterForm() {
                 placeholder="Create a password"
                 value={formData.password}
                 onChange={(e) => handleInputChange("password", e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 w-full"
                 required
                 disabled={loading}
               />
@@ -187,7 +187,7 @@ export function RegisterForm() {
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
                 required
                 disabled={loading}
               />

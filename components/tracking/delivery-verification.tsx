@@ -54,13 +54,13 @@ export function DeliveryVerification() {
 
   if (success) {
     return (
-      <Card className="border-green-200 bg-green-50/50">
+      <Card className="border-green-200 bg-green-50/50 w-full max-w-md mx-auto sm:max-w-lg">
         <CardContent className="text-center py-12">
           <div className="mx-auto bg-green-100 text-green-600 p-4 rounded-full w-fit mb-6 animate-pulse">
             <CheckCircle className="h-10 w-10" />
           </div>
-          <h3 className="text-2xl font-bold mb-3 text-green-700">Delivery Verified Successfully!</h3>
-          <p className="text-muted-foreground mb-6 text-lg">
+          <h3 className="text-2xl font-bold mb-3 text-green-700 sm:text-3xl">Delivery Verified Successfully!</h3>
+          <p className="text-muted-foreground mb-6 text-lg sm:text-xl">
             The package has been marked as delivered in our system. Thank you for using KIVU Belt Express!
           </p>
           <div className="space-y-3">
@@ -81,18 +81,18 @@ export function DeliveryVerification() {
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-2xl sm:text-3xl">
           <Package className="h-5 w-5" />
           Verify Delivery
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm sm:text-base">
           Enter the package ID and pickup code to verify delivery. Only the receiver should have the pickup code.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -108,6 +108,7 @@ export function DeliveryVerification() {
               onChange={(e) => handleInputChange("packageId", e.target.value)}
               required
               disabled={loading}
+              className="w-full"
             />
           </div>
 
@@ -121,6 +122,7 @@ export function DeliveryVerification() {
               maxLength={6}
               required
               disabled={loading}
+              className="w-full"
             />
           </div>
 
@@ -134,14 +136,14 @@ export function DeliveryVerification() {
               "Verify Delivery"
             )}
           </Button>
-        </form>
 
-        <div className="mt-4 p-4 bg-muted rounded-lg">
+        <div className="mt-4 p-4 bg-muted rounded-lg text-center sm:text-left">
           <p className="text-sm text-muted-foreground">
             <strong>Note:</strong> The pickup code is provided to the receiver when the package is registered. This
             ensures that only the intended recipient can confirm delivery.
           </p>
         </div>
+        </form>
       </CardContent>
     </Card>
   )

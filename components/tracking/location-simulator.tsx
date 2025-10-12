@@ -56,20 +56,20 @@ export function LocationSimulator({ trackingNumber, onLocationUpdate }: Location
   }
 
   return (
-    <Card className="border-0 shadow-lg">
+    <Card className="border-0 shadow-lg w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl lg:text-3xl flex-wrap">
           <MapPin className="h-5 w-5 text-primary" />
           Location Simulator
-          <Badge variant={isSimulating ? "default" : "secondary"}>{isSimulating ? "Running" : "Stopped"}</Badge>
+          <Badge variant={isSimulating ? "default" : "outline"} className="ml-auto text-sm sm:text-base">{isSimulating ? "Running" : "Stopped"}</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-3">
+      <CardContent className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Button
             onClick={isSimulating ? stopSimulation : startSimulation}
             variant={isSimulating ? "destructive" : "default"}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto"
           >
             {isSimulating ? (
               <>
@@ -84,25 +84,25 @@ export function LocationSimulator({ trackingNumber, onLocationUpdate }: Location
             )}
           </Button>
 
-          <Button onClick={resetSimulation} variant="outline" className="flex items-center gap-2 bg-transparent">
+          <Button onClick={resetSimulation} variant="outline" className="flex items-center gap-2 bg-transparent w-full sm:w-auto">
             <RotateCcw className="h-4 w-4" />
             Reset
           </Button>
         </div>
 
-        <div className="p-4 bg-card rounded-lg border">
-          <div className="text-sm text-muted-foreground mb-2">Current Location:</div>
-          <div className="font-medium">{routePoints[currentStep].address}</div>
-          <div className="font-mono text-sm text-muted-foreground">
+        <div className="p-4 bg-card rounded-lg border space-y-1 sm:space-y-2">
+          <div className="text-sm text-muted-foreground mb-2 sm:text-base">Current Location:</div>
+          <div className="font-medium text-base sm:text-lg lg:text-xl">{routePoints[currentStep].address}</div>
+          <div className="font-mono text-sm text-muted-foreground sm:text-base">
             {routePoints[currentStep].latitude.toFixed(6)}, {routePoints[currentStep].longitude.toFixed(6)}
           </div>
-          <div className="text-xs text-muted-foreground mt-2">
+          <div className="text-xs text-muted-foreground mt-2 sm:text-sm lg:text-base">
             Step {currentStep + 1} of {routePoints.length}
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Route Progress:</div>
+        <div className="space-y-2 sm:space-y-3">
+          <div className="text-sm font-medium sm:text-base lg:text-lg">Route Progress:</div>
           <div className="space-y-1">
             {routePoints.map((point, index) => (
               <div
@@ -120,7 +120,7 @@ export function LocationSimulator({ trackingNumber, onLocationUpdate }: Location
                     index === currentStep ? "bg-primary" : index < currentStep ? "bg-green-500" : "bg-gray-300"
                   }`}
                 />
-                {point.address}
+                <span className="text-sm sm:text-base lg:text-lg">{point.address}</span>
               </div>
             ))}
           </div>

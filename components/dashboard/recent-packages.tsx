@@ -55,9 +55,9 @@ export function RecentPackages() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="w-full max-w-full">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <PackageIcon className="h-5 w-5" />
             Recent Packages
           </CardTitle>
@@ -72,13 +72,13 @@ export function RecentPackages() {
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
           <PackageIcon className="h-5 w-5" />
           Recent Packages
         </CardTitle>
-        <CardDescription>Latest package registrations and updates</CardDescription>
+        <CardDescription className="text-sm sm:text-base">Latest package registrations and updates</CardDescription>
       </CardHeader>
       <CardContent>
         {packages.length === 0 ? (
@@ -87,16 +87,16 @@ export function RecentPackages() {
             <p className="text-muted-foreground">No packages found</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <Table>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[700px] md:min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Package ID</TableHead>
-                  <TableHead>Receiver</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Fee</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[20%]">Package ID</TableHead>
+                  <TableHead className="w-[25%]">Receiver</TableHead>
+                  <TableHead className="w-[15%]">Status</TableHead>
+                  <TableHead className="w-[15%]">Fee</TableHead>
+                  <TableHead className="w-[15%]">Created</TableHead>
+                  <TableHead className="w-[10%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -105,8 +105,8 @@ export function RecentPackages() {
                     <TableCell className="font-mono font-medium">{pkg.package_id}</TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{pkg.receiver_name}</p>
-                        <p className="text-sm text-muted-foreground">{pkg.receiver_phone}</p>
+                        <p className="font-medium text-sm">{pkg.receiver_name}</p>
+                        <p className="text-xs text-muted-foreground">{pkg.receiver_phone}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -115,10 +115,10 @@ export function RecentPackages() {
                       </Badge>
                     </TableCell>
                     <TableCell>{formatCurrency(pkg.delivery_fee)}</TableCell>
-                    <TableCell>{formatDate(pkg.created_at)}</TableCell>
+                    <TableCell className="text-xs">{formatDate(pkg.created_at)}</TableCell>
                     <TableCell>
                       <Link href={`/dashboard/packages/${pkg.package_id}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
@@ -128,9 +128,9 @@ export function RecentPackages() {
               </TableBody>
             </Table>
 
-            <div className="flex justify-center">
+            <div className="flex justify-center mt-4">
               <Link href="/dashboard/packages">
-                <Button variant="outline">View All Packages</Button>
+                <Button variant="outline" className="w-full sm:w-auto">View All Packages</Button>
               </Link>
             </div>
           </div>

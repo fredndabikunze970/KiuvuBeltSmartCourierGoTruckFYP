@@ -156,11 +156,11 @@ export function NewPackageRegistrationForm() {
             </AlertDescription>
           </Alert>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-col sm:flex-row">
             <Button onClick={() => setSuccess(null)} className="flex-1">
               Register Another Package
             </Button>
-            <Button variant="outline" onClick={() => window.print()}>
+            <Button variant="outline" onClick={() => window.print()} className="flex-1">
               Print Slip
             </Button>
           </div>
@@ -177,7 +177,7 @@ export function NewPackageRegistrationForm() {
         </div>
         Sender Information
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2">
           <Label htmlFor="senderName">Full Name *</Label>
           <Input
@@ -185,6 +185,7 @@ export function NewPackageRegistrationForm() {
             {...form.register("senderName")}
             placeholder="John Doe"
             disabled={loading}
+            className="w-full"
           />
           {form.formState.errors.senderName && (
             <p className="text-sm text-red-500">{form.formState.errors.senderName.message}</p>
@@ -198,7 +199,7 @@ export function NewPackageRegistrationForm() {
               id="senderPhone"
               {...form.register("senderPhone")}
               placeholder="+250788123456"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -215,7 +216,7 @@ export function NewPackageRegistrationForm() {
             id="senderAddress"
             {...form.register("senderAddress")}
             placeholder="Street address, city, district"
-            className="pl-10"
+            className="pl-10 w-full"
             disabled={loading}
           />
         </div>
@@ -229,7 +230,7 @@ export function NewPackageRegistrationForm() {
           value={form.getValues("originBranchId")}
           onValueChange={(value) => form.setValue("originBranchId", value)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Select pickup branch" />
           </SelectTrigger>
           <SelectContent>
@@ -255,7 +256,7 @@ export function NewPackageRegistrationForm() {
         </div>
         Receiver Information
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2">
           <Label htmlFor="receiverName">Full Name *</Label>
           <Input
@@ -263,6 +264,7 @@ export function NewPackageRegistrationForm() {
             {...form.register("receiverName")}
             placeholder="Jane Smith"
             disabled={loading}
+            className="w-full"
           />
           {form.formState.errors.receiverName && (
             <p className="text-sm text-red-500">{form.formState.errors.receiverName.message}</p>
@@ -276,7 +278,7 @@ export function NewPackageRegistrationForm() {
               id="receiverPhone"
               {...form.register("receiverPhone")}
               placeholder="+250788654321"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -293,7 +295,7 @@ export function NewPackageRegistrationForm() {
             id="receiverAddress"
             {...form.register("receiverAddress")}
             placeholder="Street address, city, district"
-            className="pl-10"
+            className="pl-10 w-full"
             disabled={loading}
           />
         </div>
@@ -307,7 +309,7 @@ export function NewPackageRegistrationForm() {
           value={form.getValues("destinationBranchId")}
           onValueChange={(value) => form.setValue("destinationBranchId", value)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Select delivery branch" />
           </SelectTrigger>
           <SelectContent>
@@ -340,12 +342,13 @@ export function NewPackageRegistrationForm() {
           {...form.register("packageDescription")}
           placeholder="Brief description of package contents"
           disabled={loading}
+          className="w-full"
         />
         {form.formState.errors.packageDescription && (
           <p className="text-sm text-red-500">{form.formState.errors.packageDescription.message}</p>
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <div className="space-y-2">
           <Label htmlFor="weight">Weight (kg)</Label>
           <div className="relative">
@@ -356,7 +359,7 @@ export function NewPackageRegistrationForm() {
               step="0.1"
               {...form.register("weight")}
               placeholder="2.5"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -372,7 +375,7 @@ export function NewPackageRegistrationForm() {
               id="dimensions"
               {...form.register("dimensions")}
               placeholder="30x20x10 cm"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -389,7 +392,7 @@ export function NewPackageRegistrationForm() {
               type="number"
               {...form.register("declaredValue")}
               placeholder="50000"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -409,14 +412,14 @@ export function NewPackageRegistrationForm() {
         </div>
         Delivery Options
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2">
           <Label htmlFor="priority">Priority</Label>
           <Select
             value={form.getValues("priority")}
             onValueChange={(value: "normal" | "express" | "urgent") => form.setValue("priority", value)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -438,7 +441,7 @@ export function NewPackageRegistrationForm() {
               type="number"
               {...form.register("deliveryFee")}
               placeholder="5000"
-              className="pl-10"
+              className="pl-10 w-full"
               disabled={loading}
             />
           </div>
@@ -457,10 +460,10 @@ export function NewPackageRegistrationForm() {
 
     return (
       <div className="space-y-6 animate-slide-up-fade [animation-delay:100ms]">
-        <div className="grid gap-6">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           <div>
             <h3 className="text-lg font-semibold">Sender Details</h3>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 text-sm">
               <p><span className="font-medium">Name:</span> {formData.senderName}</p>
               <p><span className="font-medium">Phone:</span> {formData.senderPhone}</p>
               <p><span className="font-medium">Address:</span> {formData.senderAddress}</p>
@@ -469,7 +472,7 @@ export function NewPackageRegistrationForm() {
           </div>
           <div>
             <h3 className="text-lg font-semibold">Receiver Details</h3>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 text-sm">
               <p><span className="font-medium">Name:</span> {formData.receiverName}</p>
               <p><span className="font-medium">Phone:</span> {formData.receiverPhone}</p>
               <p><span className="font-medium">Address:</span> {formData.receiverAddress}</p>
@@ -478,7 +481,7 @@ export function NewPackageRegistrationForm() {
           </div>
           <div>
             <h3 className="text-lg font-semibold">Package Details</h3>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 text-sm">
               <p><span className="font-medium">Description:</span> {formData.packageDescription || "N/A"}</p>
               <p><span className="font-medium">Weight:</span> {formData.weight ? `${formData.weight} kg` : "N/A"}</p>
               <p><span className="font-medium">Dimensions:</span> {formData.dimensions || "N/A"}</p>
@@ -532,18 +535,18 @@ export function NewPackageRegistrationForm() {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto sm:max-w-3xl lg:max-w-4xl">
       <CardHeader>
         <div className="flex items-center justify-center mb-4">
           <div className="p-3 rounded-full bg-primary/10">
             <Package className="h-6 w-6 text-primary" />
           </div>
         </div>
-        <CardTitle className="text-center text-2xl">{stepTitles[currentStep].title}</CardTitle>
-        <CardDescription className="text-center">{stepTitles[currentStep].description}</CardDescription>
+        <CardTitle className="text-center text-2xl sm:text-3xl">{stepTitles[currentStep].title}</CardTitle>
+        <CardDescription className="text-center text-sm sm:text-base">{stepTitles[currentStep].description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -552,17 +555,18 @@ export function NewPackageRegistrationForm() {
 
           {renderCurrentStep()}
 
-          <div className="flex justify-between mt-6">
+          <div className="flex justify-between mt-6 flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === "sender" || loading}
+              className="flex-1 sm:flex-none"
             >
               Previous
             </Button>
 
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="flex-1 sm:flex-none">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

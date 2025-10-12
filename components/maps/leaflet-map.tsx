@@ -109,5 +109,5 @@ export function LeafletMap({ center, zoom = 13, markers = [], className = "" }: 
     })
   }, [markers])
 
-  return <div ref={mapRef} className={`leaflet-container ${className}`} />
+  return <div ref={mapRef} className={`w-full h-full leaflet-container ${className}`} />
 }

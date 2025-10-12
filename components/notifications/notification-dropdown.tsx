@@ -140,7 +140,7 @@ export const NotificationDropdown = () => {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           className="relative h-9 w-9 border border-gray-200 hover:bg-gray-50 hover:shadow-sm transition-all duration-200"
           aria-label="Open notifications"
         >
@@ -153,10 +153,10 @@ export const NotificationDropdown = () => {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-96 p-0" align="end" sideOffset={8}>
+      <DropdownMenuContent className="w-80 sm:w-96 p-0" align="end" sideOffset={8}>
         <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
           <div className="flex items-center gap-2">
-            <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="p-0 text-base sm:text-lg">Notifications</DropdownMenuLabel>
             {unreadCount > 0 && (
               <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
                 {unreadCount} new
@@ -211,13 +211,13 @@ export const NotificationDropdown = () => {
                         : "bg-blue-50/60 hover:bg-blue-100/60 border-blue-200"
                     )}
                   >
-                    <div className="flex items-start gap-2">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                       <div className={cn(
-                        "mt-1 h-2 w-2 rounded-full",
+                        "mt-1 h-2 w-2 rounded-full flex-shrink-0",
                         n.status === "read" ? "bg-gray-300" : "bg-blue-500"
                       )} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
                           <p className="text-sm font-semibold text-gray-900 truncate">
                             {n.notification_type ? n.notification_type[0].toUpperCase() + n.notification_type.slice(1) : "Notification"}
                           </p>
@@ -225,7 +225,7 @@ export const NotificationDropdown = () => {
                             {formatDate(n.created_at)}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-700 leading-snug line-clamp-2">
+                        <p className="text-sm text-gray-700 leading-snug line-clamp-2 mt-1">
                           {n.message}
                         </p>
                         {n.package_id && (
@@ -248,7 +248,7 @@ export const NotificationDropdown = () => {
         <div className="px-3 py-2 text-center">
           <Link
             href="/dashboard/notifications"
-            className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline"
+            className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline w-full"
           >
             View all notifications
           </Link>

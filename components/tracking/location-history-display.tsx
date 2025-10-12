@@ -48,26 +48,26 @@ export function LocationHistoryDisplay({ locationHistory }: LocationHistoryDispl
     }
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4 sm:space-y-6">
             {locationHistory.map((location, index) => (
                 <Card key={index} className={index === 0 ? "border-blue-500 border-2" : ""}>
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-sm">
+                        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                             <Navigation className={`h-4 w-4 ${index === 0 ? 'text-blue-600 animate-pulse' : 'text-muted-foreground'}`} />
                             {index === 0 ? "Current Location" : `Location ${index + 1}`}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent className="space-y-2 sm:space-y-3">
                         {/* Address */}
                         {location.address && (
-                            <div className="flex items-start gap-2 text-sm">
+                            <div className="flex items-start gap-2 text-sm sm:text-base flex-wrap">
                                 <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                                 <p className="text-foreground font-medium">{location.address}</p>
                             </div>
                         )}
 
                         {/* Coordinates */}
-                        <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm">
                             <div className="w-4 h-4 flex items-center justify-center">
                                 <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                             </div>
@@ -77,7 +77,7 @@ export function LocationHistoryDisplay({ locationHistory }: LocationHistoryDispl
                         </div>
 
                         {/* Time and Speed */}
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t sm:gap-6">
                             <div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                                     <Clock className="h-3 w-3" />
@@ -103,7 +103,7 @@ export function LocationHistoryDisplay({ locationHistory }: LocationHistoryDispl
 
                         {/* Accuracy */}
                         {location.accuracy && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs sm:text-sm text-muted-foreground">
                                 Accuracy: ±{location.accuracy.toFixed(0)}m
                             </div>
                         )}

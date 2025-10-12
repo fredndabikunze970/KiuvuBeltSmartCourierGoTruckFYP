@@ -15,26 +15,26 @@ export async function ManagementCards() {
   const totalDrivers = driversData.drivers.length
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       <DashboardCard
         title="Total Branches"
         value={branchesData.branches.length.toString()}
         description="Active delivery locations"
-        icon={<Building2 className="h-4 w-4" />}
+        icon={Building2}
         className="bg-blue-50"
       />
       <DashboardCard
         title="Fleet Status"
         value={`${availableCars}/${totalCars}`}
         description="Available vehicles"
-        icon={<Car className="h-4 w-4" />}
+        icon={Car}
         className="bg-green-50"
       />
       <DashboardCard
         title="Driver Status"
         value={`${activeDrivers}/${totalDrivers}`}
         description="Active drivers"
-        icon={<Users className="h-4 w-4" />}
+        icon={Users}
         className="bg-blue-50"
       />
     </div>
