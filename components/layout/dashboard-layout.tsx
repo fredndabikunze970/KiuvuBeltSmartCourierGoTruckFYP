@@ -267,17 +267,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const ProfessionalFooter = React.memo(function ProfessionalFooter() {
     return (
-    <footer className="bg-white border-t border-gray-200 mt-auto p-4 sm:p-6">
+    <footer className="bg-white border-t border-gray-200 flex-shrink-0 p-4 sm:p-6 mt-8">
       <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
-          <div className="flex items-center gap-2 mb-4 md:mb-0">
+        <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-4">
+          <div className="flex items-center gap-2">
             <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white p-1.5 rounded">
               <Truck className="h-4 w-4" />
             </div>
             <span className="font-semibold text-gray-900">KIVU Belt Express</span>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600 mb-4 md:mb-0">
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
             <Link href="/privacy" className="hover:text-blue-600 transition-colors">
               Privacy Policy
             </Link>
@@ -292,7 +292,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
           </div>
 
-          <div className="mt-4 md:mt-0 text-xs text-gray-500">
+          <div className="text-xs text-gray-500">
             © {new Date().getFullYear()} KIVU Belt Express. All rights reserved.
           </div>
         </div>
@@ -338,7 +338,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Sheet>
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col lg:ml-64 min-h-0">
+      <div className="flex-1 flex flex-col lg:ml-64 min-h-screen">
         {/* Header */}
         <header className="h-16 border-b bg-white sticky top-0 z-30 flex items-center px-4 sm:px-6 shrink-0 shadow-sm">
           <div className="flex-1 flex items-center gap-4">
@@ -380,7 +380,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto bg-gray-50/50">
-          <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="w-full">
             {children}
           </div>
         </main>

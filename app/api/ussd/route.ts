@@ -102,65 +102,138 @@ export async function POST(request: NextRequest) {
           } else {
             const packageData = packageResult[0]
 
-            // Get real progress from the main tracking API
+            // Calculate real progress using LocationIQ directly (same as web tracking)
             let realProgress = 0
-            try {
-              console.log('USSD: Fetching real progress from tracking API for:', trackingNumber)
-              // Use relative URL for internal API calls (works in both dev and production)
-              const trackingApiUrl = `/api/tracking/${trackingNumber}`
-              console.log('USSD: Calling tracking API URL:', trackingApiUrl)
+            let locationIQDistanceInfo = ''
+            let routeDistance = null
+            let distanceTraveled = 0
+            let distanceRemaining = 0
+            
+            console.log('USSD: Starting LocationIQ progress calculation for:', trackingNumber)
 
-              const trackingResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${trackingApiUrl}`, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              })
+            // Get origin and destination branches for route calculation
+            const originBranch = await sql`
+              SELECT * FROM branches WHERE branch_id = ${packageData.origin_branch_id}
+            `
+            const destBranch = await sql`
+              SELECT * FROM branches WHERE branch_id = ${packageData.destination_branch_id}
+            `
 
-              console.log('USSD: Tracking API response status:', trackingResponse.status)
+            console.log('USSD: Origin branch:', originBranch[0]?.branch_name)
+            console.log('USSD: Destination branch:', destBranch[0]?.branch_name)
 
-              if (trackingResponse.ok) {
-                const trackingData = await trackingResponse.json()
-                console.log('USSD: Full tracking API response:', JSON.stringify(trackingData, null, 2))
+            if (originBranch.length > 0 && destBranch.length > 0) {
+              const apiKey = process.env.NEXT_PUBLIC_LOCATIONIQ_KEY
 
-                // Always use progress from tracking API response
-                if (trackingData && typeof trackingData.progress === 'number') {
-                  realProgress = Math.min(100, Math.max(0, trackingData.progress))
-                  console.log('USSD: Using progress from tracking API:', realProgress)
-                } else if (trackingData.routeDistance && trackingData.distanceTraveled) {
-                  // Fallback to distance-based calculation if no direct progress
-                  const routeDistance = trackingData.routeDistance  // in meters
-                  const distanceTraveled = trackingData.distanceTraveled  // in meters
-                  realProgress = Math.min(100, Math.max(0, (distanceTraveled / routeDistance) * 100))
-                  console.log('USSD: Calculated progress from distances:', {
-                    routeDistance,
-                    distanceTraveled,
-                    calculatedProgress: realProgress
-                  })
-                } else if (trackingData.status === 'delivered') {
-                  realProgress = 100
-                  console.log('USSD: Package is delivered, setting progress to 100%')
-                } else {
-                  console.log('USSD: No progress data found in tracking response:', trackingData)
-                  realProgress = 0
+              if (apiKey) {
+                try {
+                  // Get total route distance from LocationIQ
+                  const routeUrl = `https://us1.locationiq.com/v1/directions/driving/${originBranch[0].longitude},${originBranch[0].latitude};${destBranch[0].longitude},${destBranch[0].latitude}?key=${apiKey}&overview=simplified`
+                  
+                  console.log('USSD: Fetching route distance from LocationIQ...')
+                  const routeResponse = await fetch(routeUrl)
+
+                  if (routeResponse.ok) {
+                    const routeData = await routeResponse.json()
+                    const route = routeData?.routes?.[0]
+                    
+                    if (route) {
+                      routeDistance = route.distance // in meters
+                      console.log('USSD: Total route distance:', (routeDistance / 1000).toFixed(2), 'km')
+
+                      // Get real-time vehicle location from Firebase
+                      let vehicleId = packageData.assigned_car
+
+                      if (!vehicleId) {
+                        const vehicleCheck = await sql`
+                          SELECT assigned_vehicle_id, vehicle_id FROM tracking
+                          WHERE package_id = ${trackingNumber}
+                          AND (assigned_vehicle_id IS NOT NULL OR vehicle_id IS NOT NULL)
+                          ORDER BY created_at DESC
+                          LIMIT 1
+                        `
+                        vehicleId = vehicleCheck[0]?.assigned_vehicle_id || vehicleCheck[0]?.vehicle_id || null
+                      }
+
+                      console.log('USSD: Vehicle ID:', vehicleId)
+
+                      if (vehicleId) {
+                        try {
+                          const { database } = await import("@/lib/firebase")
+                          const locationRef = database.ref(`vehicles/${vehicleId}/current_location`)
+                          const snapshot = await locationRef.once("value")
+                          const locationData = snapshot.val()
+
+                          if (locationData && locationData.latitude && locationData.longitude) {
+                            console.log('USSD: Current vehicle location:', locationData.latitude, locationData.longitude)
+
+                            // Calculate distance traveled using LocationIQ
+                            const traveledUrl = `https://us1.locationiq.com/v1/directions/driving/${originBranch[0].longitude},${originBranch[0].latitude};${locationData.longitude},${locationData.latitude}?key=${apiKey}&overview=simplified`
+                            
+                            console.log('USSD: Calculating distance traveled...')
+                            const traveledResponse = await fetch(traveledUrl)
+
+                            if (traveledResponse.ok) {
+                              const traveledData = await traveledResponse.json()
+                              const traveledRoute = traveledData?.routes?.[0]
+
+                              if (traveledRoute) {
+                                distanceTraveled = traveledRoute.distance // in meters
+                                distanceRemaining = Math.max(0, routeDistance - distanceTraveled)
+
+                                // Calculate progress percentage (same formula as web tracking)
+                                realProgress = Math.min(100, Math.max(0, (distanceTraveled / routeDistance) * 100))
+
+                                console.log('USSD: Progress calculation:', {
+                                  totalDistance: (routeDistance / 1000).toFixed(2) + ' km',
+                                  distanceTraveled: (distanceTraveled / 1000).toFixed(2) + ' km',
+                                  distanceRemaining: (distanceRemaining / 1000).toFixed(2) + ' km',
+                                  progress: realProgress.toFixed(1) + '%'
+                                })
+
+                                // Format distance info for display
+                                const totalKm = (routeDistance / 1000).toFixed(2)
+                                const traveledKm = (distanceTraveled / 1000).toFixed(2)
+                                const remainingKm = (distanceRemaining / 1000).toFixed(2)
+                                locationIQDistanceInfo = `\nDistance: ${traveledKm}/${totalKm} km (${remainingKm} km left)`
+                              } else {
+                                console.log('USSD: No traveled route found in LocationIQ response')
+                              }
+                            } else {
+                              console.log('USSD: LocationIQ distance traveled API failed:', traveledResponse.status)
+                            }
+                          } else {
+                            console.log('USSD: No valid location data in Firebase')
+                          }
+                        } catch (firebaseError) {
+                          console.log('USSD: Firebase error:', firebaseError)
+                        }
+                      } else {
+                        console.log('USSD: No vehicle assigned to package')
+                      }
+                    } else {
+                      console.log('USSD: No route found in LocationIQ response')
+                    }
+                  } else {
+                    console.log('USSD: LocationIQ route API failed:', routeResponse.status)
+                  }
+                } catch (locationIQError) {
+                  console.log('USSD: LocationIQ error:', locationIQError)
                 }
               } else {
-                console.log('USSD: Tracking API call failed:', trackingResponse.status)
-                const errorText = await trackingResponse.text()
-                console.log('USSD: Tracking API error response:', errorText)
+                console.log('USSD: LocationIQ API key not configured')
               }
-            } catch (error) {
-              console.log('USSD: Error fetching real progress:', error)
+            } else {
+              console.log('USSD: Branch information not found')
             }
 
-            // Fallback to database progress if API fails
-            if (realProgress === 0) {
-              const latestTracking = await sql`
-                SELECT status, progress_percentage FROM tracking WHERE package_id = ${trackingNumber} ORDER BY created_at DESC LIMIT 1
-              `
-              realProgress = latestTracking.length > 0 ? latestTracking[0].progress_percentage : 0
-              console.log('USSD: Using fallback progress from database:', realProgress)
+            // If delivered, set to 100%
+            if (packageData.status === 'delivered') {
+              realProgress = 100
+              console.log('USSD: Package is delivered, setting progress to 100%')
             }
+
+            console.log('USSD: Final progress:', realProgress.toFixed(1) + '%')
 
             // Fetch real-time location from Firebase
             let currentLocationText = ''
@@ -241,17 +314,14 @@ export async function POST(request: NextRequest) {
             const progress = realProgress
             const progressBar = generateProgressBar(progress)
 
-            // Format distance info if available
-            let distanceInfo = ''
-            if (packageData.distance) {
-              distanceInfo = `\nTotal Distance: ${(packageData.distance / 1000).toFixed(2)} km`
-            }
+            // Use LocationIQ distance info (real-time calculated distances)
+            const finalDistanceInfo = locationIQDistanceInfo || ''
 
-            // Compose USSD response text with additional info
+            // Compose USSD response text with LocationIQ-based progress
             const responseText = `END Package Status: ${statusText}
 Tracking: ${packageData.package_id}
 
-Progress: ${progressBar}${distanceInfo}
+Progress: ${progressBar}${finalDistanceInfo}
 
 From: ${packageData.origin_branch_name || 'Origin'}
 To: ${packageData.destination_branch_name || 'Destination'}${currentLocationText}

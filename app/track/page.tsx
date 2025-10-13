@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 
 export default function TrackPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 pb-20"> {/* Add padding bottom */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 flex flex-col">
       {/* Public Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
+      <header className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -41,17 +41,13 @@ export default function TrackPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-7xl mx-auto">
-            <PackageTracker />
-          </div>
-        </div>
+      {/* Main Content - Grows to push footer down */}
+      <main className="flex-1 w-full">
+        <PackageTracker />
       </main>
 
-      {/* Footer - Fixed at bottom */}
-      <footer className="bg-white border-t border-gray-200 w-full fixed bottom-0 left-0 right-0">
+      {/* Footer - Professional, comes after content */}
+      <footer className="bg-white border-t border-gray-200 w-full flex-shrink-0 mt-8">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">

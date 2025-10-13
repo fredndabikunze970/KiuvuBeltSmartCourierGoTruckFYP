@@ -11,7 +11,9 @@ import { componentColors } from '@/lib/colors';
 
 // Dynamically import the enhanced map component
 const EnhancedRealTimeTrackingMap = dynamic(
-    () => import('@/components/maps/real-time-tracking-map').then(mod => mod.EnhancedRealTimeTrackingMap),
+    () => import('@/components/maps/real-time-tracking-map').then((mod) => ({ 
+        default: mod.EnhancedRealTimeTrackingMap 
+    })),
     {
         ssr: false,
         loading: () => (
