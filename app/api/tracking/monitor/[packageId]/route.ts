@@ -208,24 +208,36 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
             WHERE package_id = ${packageId} AND (progress_percentage IS NULL OR progress_percentage < 100)
           `
 
-          // Compose professional arrival message
-          const arrivalMsg = `KIVU Belt Express: Package ${packageId} has arrived at its destination. Thank you for choosing KIVU Belt Express.`
+          // Compose arrival messages. For Twilio trial accounts it's common to include a trial prefix
+          const publicBase = process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')
+            ? process.env.NEXT_PUBLIC_API_URL
+            : `https://kivubeltsmartcouriergotruck.onrender.com`
 
-          if (pkg.sender_phone) {
-            try {
-              const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone)
-              await sendSMS({ to: formattedSenderPhone, message: arrivalMsg })
-            } catch (err) {
-              console.error('Failed to send arrival SMS to sender:', err)
-            }
-          }
+          const trackingUrl = `${publicBase}/api/track/${packageId}`
 
+          // Receiver-friendly trial message (explicit per your request)
+          const arrivalMsgReceiver = `Twilio trial account - Receiver Update: KIVU Belt Express: Package ${packageId} is 100% complete. Track: ${trackingUrl}`
+
+          // Sender/professional message
+          const arrivalMsgSender = `KIVU Belt Express: Package ${packageId} has arrived at its destination. Track: ${trackingUrl}`
+
+          // Send receiver message (trial-formatted) only to receiver phone
           if (pkg.receiver_phone) {
             try {
               const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone)
-              await sendSMS({ to: formattedReceiverPhone, message: arrivalMsg })
+              await sendSMS({ to: formattedReceiverPhone, message: arrivalMsgReceiver })
             } catch (err) {
               console.error('Failed to send arrival SMS to receiver:', err)
+            }
+          }
+
+          // Optionally notify sender with a professional message
+          if (pkg.sender_phone) {
+            try {
+              const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone)
+              await sendSMS({ to: formattedSenderPhone, message: arrivalMsgSender })
+            } catch (err) {
+              console.error('Failed to send arrival SMS to sender:', err)
             }
           }
         }

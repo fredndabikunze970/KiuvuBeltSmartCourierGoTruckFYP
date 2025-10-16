@@ -37,7 +37,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center sm:text-3xl">Welcome Back</CardTitle>
+        <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-center text-transparent">Welcome Back</CardTitle>
         <CardDescription className="text-center text-sm sm:text-base">Sign in to your KIVU Belt Express account</CardDescription>
       </CardHeader>
       <CardContent>
