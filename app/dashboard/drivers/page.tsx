@@ -5,22 +5,23 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiService } from "@/lib/api"
+import { getStatusColor } from "@/lib/utils"
 import { driverSchema } from "@/lib/validations/management"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Car as CarIcon, Edit, Loader2, Phone, Plus, Trash, Users } from "lucide-react"
+import { Edit, Loader2, Plus, Trash, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import type * as z from "zod"
@@ -253,14 +254,15 @@ export default function DriverManagementPage() {
               <div className="space-y-2">
                 <Label htmlFor="assigned_car">Assigned Vehicle</Label>
                 <Select
-                  value={form.getValues("assigned_car") || ""}
-                  onValueChange={(value) => form.setValue("assigned_car", value || null)}
+                  // Use a non-empty sentinel value for "no vehicle" and map it to null in the form
+                  value={form.getValues("assigned_car") ?? "none"}
+                  onValueChange={(value) => form.setValue("assigned_car", value === "none" ? null : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select vehicle" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {cars.map((car) => (
                       <SelectItem key={car.car_id} value={car.car_id}>
                         {car.plate_number} - {car.model}
@@ -313,78 +315,79 @@ export default function DriverManagementPage() {
         </Dialog>
       </div>
 
-      <div className="border rounded-lg">
-        {loading ? (
-          <div className="flex items-center justify-center h-[450px]">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : drivers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[450px] space-y-4">
-            <Users className="h-8 w-8 text-muted-foreground" />
-            <div className="text-lg font-medium text-muted-foreground">No drivers found</div>
-            <p className="text-sm text-muted-foreground">Add your first driver to get started.</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-3">
-            {drivers.map((driver) => (
-          <div
-            key={driver.driver_id}
-            className="p-4 border rounded-lg bg-card hover:bg-accent/5 transition-colors space-y-4"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <Avatar>
-                  <AvatarFallback>{getInitials(driver.full_name)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold">{driver.full_name}</h3>
-                  <p className="text-sm text-muted-foreground">{driver.license_number}</p>
+      <div className="w-full rounded-lg border bg-card overflow-hidden">
+        {/* Header row for medium+ screens */}
+        <div className="hidden md:grid grid-cols-12 gap-4 p-3 text-sm font-medium text-muted-foreground bg-muted/5">
+          <div className="col-span-3">Driver</div>
+          <div className="col-span-2">Phone</div>
+          <div className="col-span-2">Branch</div>
+          <div className="col-span-2">Vehicle</div>
+          <div className="col-span-1">Status</div>
+          <div className="col-span-2 text-right">Actions</div>
+        </div>
+
+        <div className="divide-y">
+          {loading ? (
+            <div className="flex items-center justify-center h-[200px] p-6">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : drivers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[200px] p-6 space-y-4">
+              <Users className="h-8 w-8 text-muted-foreground" />
+              <div className="text-lg font-medium text-muted-foreground">No drivers found</div>
+              <p className="text-sm text-muted-foreground">Add your first driver to get started.</p>
+            </div>
+          ) : (
+            drivers.map((driver) => (
+              <div key={driver.driver_id} className="grid grid-cols-12 gap-4 items-center p-4 hover:bg-muted/5">
+                <div className="col-span-12 md:col-span-3 flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>{getInitials(driver.full_name)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-semibold">{driver.full_name}</div>
+                    <div className="text-xs text-muted-foreground md:hidden">{driver.license_number}</div>
+                  </div>
+                </div>
+
+                <div className="col-span-6 md:col-span-2 text-sm">
+                  <div className="font-medium">{driver.phone}</div>
+                </div>
+
+                <div className="col-span-6 md:col-span-2 text-sm">
+                  <div className="font-medium">{driver.branch_name}</div>
+                </div>
+
+                <div className="col-span-6 md:col-span-2 text-sm">
+                  <div className="font-medium">
+                    {driver.plate_number && driver.model
+                      ? `${driver.plate_number} · ${driver.model}`
+                      : driver.assigned_car
+                        ? driver.assigned_car
+                        : '—'}
+                  </div>
+                </div>
+
+                <div className="col-span-6 md:col-span-1 text-sm">
+                  <div className="mt-1">
+                    <Badge className={`${driver.assigned_car ? getStatusColor('in_transit') : getStatusColor('pending')} px-3 py-1 rounded-full text-xs`}>
+                      {driver.assigned_car ? 'On Duty' : 'Available'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="col-span-12 md:col-span-2 flex justify-end items-center space-x-2">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(driver)} aria-label={`Edit ${driver.full_name}`}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(driver.driver_id)} aria-label={`Delete ${driver.full_name}`}>
+                    <Trash className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleEdit(driver)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleDelete(driver.driver_id)}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{driver.phone}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span>{driver.branch_name}</span>
-              </div>
-              {driver.assigned_car && (
-                <div className="flex items-center space-x-2 text-sm">
-                  <CarIcon className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {driver.plate_number} - {driver.model}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <Badge variant={driver.assigned_car ? "default" : "secondary"}>
-              {driver.assigned_car ? "On Duty" : "Available"}
-            </Badge>
-          </div>
-        ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
     </DashboardLayout>

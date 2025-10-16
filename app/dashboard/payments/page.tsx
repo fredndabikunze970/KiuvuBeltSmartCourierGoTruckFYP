@@ -10,18 +10,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { authService } from "@/lib/auth"
 import {
-  Building,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  DollarSign,
-  Download,
-  Filter,
-  MoreVertical,
-  Search,
-  Smartphone,
-  User,
-  XCircle
+    Building,
+    CheckCircle,
+    Clock,
+    CreditCard,
+    DollarSign,
+    Download,
+    Filter,
+    MoreVertical,
+    Search,
+    Smartphone,
+    User,
+    XCircle
 } from "lucide-react"
 import { useEffect, useState } from "react"
 
@@ -71,6 +71,7 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
   const [statusFilter, setStatusFilter] = useState("all")
+  const [dateRange, setDateRange] = useState<string>('all')
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
     limit: 10,
@@ -98,9 +99,11 @@ export default function PaymentsPage() {
       return
     }
 
+    // Reset to first page and fetch whenever filters or search change,
+    // include dateRange so selecting a date will immediately re-run the query.
     setPagination(prev => ({ ...prev, page: 1 }))
     fetchPayments()
-  }, [statusFilter, debouncedSearchTerm])
+  }, [statusFilter, debouncedSearchTerm, dateRange])
 
   useEffect(() => {
     if (authService.isAuthenticated()) {
@@ -118,6 +121,10 @@ export default function PaymentsPage() {
 
       if (statusFilter !== "all") {
         queryParams.append("status", statusFilter)
+      }
+
+      if (dateRange && dateRange !== 'all') {
+        queryParams.append('dateRange', dateRange)
       }
 
       if (searchTerm && searchTerm.match(/^PKG-/)) {
@@ -247,12 +254,14 @@ export default function PaymentsPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount?: number | string | null) => {
+    const num = typeof amount === 'number' ? amount : Number(amount)
+    const value = typeof num === 'number' && !Number.isNaN(num) ? num : 0
     return new Intl.NumberFormat('en-RW', {
       style: 'currency',
       currency: 'RWF',
       minimumFractionDigits: 0,
-    }).format(amount)
+    }).format(value)
   }
 
   const formatDate = (dateString: string) => {
@@ -358,7 +367,13 @@ export default function PaymentsPage() {
                     <p className="text-sm font-medium text-red-600">Total Amount</p>
                     <p className="text-2xl font-bold text-red-900 mt-1">
                       {formatCurrency(
-                        payments.reduce((sum, p) => sum + (p.payment_status === 'confirmed' ? p.amount : 0), 0)
+                        payments.reduce((sum, p) => {
+                          const amt = Number(p.amount)
+                          if (p.payment_status === 'confirmed' && !Number.isNaN(amt)) {
+                            return sum + amt
+                          }
+                          return sum
+                        }, 0)
                       )}
                     </p>
                   </div>
@@ -397,6 +412,23 @@ export default function PaymentsPage() {
                       <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="failed">Failed</option>
+                    </select>
+                  </div>
+                  {/* Date range selector */}
+                  <div className="flex items-center gap-2 px-3 py-2 border rounded-md">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <select
+                      value={dateRange}
+                      onChange={(e) => { setDateRange(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
+                      className="bg-transparent border-none outline-none text-sm"
+                      aria-label="Filter payments by date range"
+                      title="Date range filter"
+                    >
+                      <option value="all">All time</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="this_week">This week</option>
+                      <option value="this_month">This month</option>
                     </select>
                   </div>
                   <Button variant="outline" onClick={fetchPayments}>

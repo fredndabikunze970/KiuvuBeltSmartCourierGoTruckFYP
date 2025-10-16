@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { sql } from "@/lib/database"
-import { sendTemplatedSMS } from "@/lib/sms"
-import { formatPhoneNumber } from "@/lib/utils"
+// SMS sending removed from confirmation flow
 import { NextResponse, type NextRequest } from "next/server"
 
 // Add the generatePaymentReference function here
@@ -12,9 +11,9 @@ function generatePaymentReference(): string {
   return `${prefix}${timestamp}${random}`
 }
 
-export async function POST(
+async function handleConfirmPayment(
   request: NextRequest,
-  { params }: { params: { paymentId: string } }
+  params: { paymentId: string }
 ) {
   try {
     const user = await auth(request)
@@ -98,23 +97,12 @@ export async function POST(
 
     const updatedPayment = result[0]
 
-    // Send confirmation SMS to both sender and receiver
+    // Create a notification record for downstream processing (but do not send SMS).
+    // The notification is created with status 'pending' so a background worker or
+    // admin UI can process/dispatch it later.
     try {
-      // Send to sender - use currentPayment.sender_phone which we selected earlier
-      const formattedSenderPhone = formatPhoneNumber(currentPayment.sender_phone);
-      await sendTemplatedSMS(
-        formattedSenderPhone,
-        "PAYMENT_RECEIVED",
-        currentPayment.amount,
-        currentPayment.package_id
-      )
-
-      // Log success
-      console.log(`✅ Payment confirmation SMS sent to sender (${currentPayment.sender_phone})`)
-
-      // Create notification record - FIXED: Use 'sms' as notification_type
       const notificationMessage = `Payment of ${currentPayment.amount} RWF confirmed for package ${currentPayment.package_id}. Reference: ${newPaymentReference}`
-      
+
       await sql`
         INSERT INTO notifications (
           notification_id,
@@ -123,24 +111,22 @@ export async function POST(
           message,
           notification_type,
           status,
-          sent_at,
           created_at
         ) VALUES (
-          ${paymentId + '_notification'},
+          ${generatePaymentReference()},
           ${currentPayment.package_id},
           ${currentPayment.sender_phone},
           ${notificationMessage},
-          'sms', -- FIXED: Changed from 'payment_confirmation' to 'sms'
-          'sent',
-          NOW(), -- Set sent_at to current timestamp
+          'system',
+          'pending',
           NOW()
         )
       `
 
-      console.log(`✅ Notification created for payment confirmation`)
-
-    } catch (error) {
-      console.error("❌ Failed to send payment SMS to sender:", error)
+      console.log(`ℹ️ Notification record created (pending) for payment ${paymentId}`)
+    } catch (notifyError) {
+      // Non-fatal: log and continue. We don't want notification failures to block confirmation.
+      console.error(`⚠️ Failed to create notification record for payment ${paymentId}:`, notifyError)
     }
 
     // Get confirming user details
@@ -169,4 +155,12 @@ export async function POST(
       { status: 500 }
     )
   }
+}
+
+export async function POST(request: NextRequest, { params }: { params: { paymentId: string } }) {
+  return handleConfirmPayment(request, params)
+}
+
+export async function PUT(request: NextRequest, { params }: { params: { paymentId: string } }) {
+  return handleConfirmPayment(request, params)
 }

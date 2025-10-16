@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import { apiService, type Package, type TrackingEntry } from "@/lib/api"
-import { AlertCircle, CheckCircle, Clock, Loader2, MapPin, Search, Truck, AlertTriangle, Navigation, Package as PackageIcon, User, Phone, Calendar, ArrowRight } from "lucide-react"
+import { db } from "@/lib/firebase-client"
+import { geocodingService } from "@/utils/geocoding-services"
+import { off, onValue, ref } from "firebase/database"
+import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle, Clock, Loader2, MapPin, Navigation, Package as PackageIcon, Phone, Search, Truck, User } from "lucide-react"
 import { useEffect, useState } from "react"
 import { TrackingMap } from "./tracking-map"
-import { TrackingTimeline } from "./tracking-timeline"
-import { db } from "@/lib/firebase-client"
-import { ref, onValue, off } from "firebase/database"
-import { geocodingService } from "@/utils/geocoding-services"
 
 // Normalize timestamps coming from RTDB (seconds, ms, or ISO strings)
 function normalizeTimestamp(ts: any): number {
@@ -79,6 +79,7 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
     const [routePolyline, setRoutePolyline] = useState<any>(null)
     const [routeDistance, setRouteDistance] = useState<number | null>(null)
     const [locationHistory, setLocationHistory] = useState<any[]>([])
+    const [assignedCar, setAssignedCar] = useState<any>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
@@ -91,6 +92,7 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
 
             const response = await apiService.getTracking(trackingId)
             setPackageData(response.package)
+            setAssignedCar((response as any).assignedCar || null)
             setTracking(response.tracking)
             setCurrentLocation(response.currentLocation || null)
             setEstimatedTime(response.estimatedTime || null)
@@ -502,12 +504,7 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
                                         <span className="text-xs font-medium text-gray-600 print:text-xs">Delivery Progress</span>
                                         <span className="text-xs font-bold text-blue-600 print:text-xs">{progress}% Complete</span>
                                     </div>
-                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden print:h-1.5">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-1000 ease-out"
-                                            style={{ width: `${progress}%` }}
-                                        />
-                                    </div>
+                                    <Progress value={Math.max(0, Math.min(100, progress))} className="h-2 print:h-1.5" />
                                 </div>
 
                                 {/* Package Info */}
@@ -552,6 +549,24 @@ export function PackageTracker({ trackingId }: PackageTrackerProps) {
                                         <div>
                                             <p className="text-xs font-medium text-gray-600 print:text-xs">Distance</p>
                                             <p className="font-bold text-base print:text-sm">{formatDistance(routeDistance)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Branch & Vehicle Summary */}
+                                <div className="md:col-span-4">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-xs text-gray-500">From</div>
+                                            <div className="text-sm font-medium text-gray-800">{originBranch?.branch_name || '—'}</div>
+                                            <ArrowRight className="h-4 w-4 text-gray-400 mx-1" />
+                                            <div className="text-xs text-gray-500">To</div>
+                                            <div className="text-sm font-medium text-gray-800">{destinationBranch?.branch_name || '—'}</div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-xs text-gray-500">Vehicle</div>
+                                            <div className="text-sm font-medium text-blue-600">{assignedCar?.plate_number || currentLocation?.vehicleId || packageData?.assigned_car || '—'}</div>
                                         </div>
                                     </div>
                                 </div>

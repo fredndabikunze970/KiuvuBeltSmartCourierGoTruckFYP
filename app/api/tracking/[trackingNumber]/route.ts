@@ -190,6 +190,22 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
 
         console.log("🚗 Vehicle lookup:", { packageVehicle: packageData.assigned_car, resolvedVehicle: vehicleId })
 
+        // Fetch assigned car details (plate number, model) if available
+        let assignedCar = null
+        try {
+            const carRow = await sql`
+              SELECT car_id, plate_number, model FROM cars WHERE car_id = ${vehicleId}
+            `
+            if (carRow && carRow.length > 0) {
+                assignedCar = carRow[0]
+                console.log('🚘 Assigned car found:', assignedCar)
+            } else {
+                console.log('🚘 No assigned car record found for vehicleId:', vehicleId)
+            }
+        } catch (err) {
+            console.warn('🚘 Failed to lookup assigned car:', err)
+        }
+
         try {
             const { database } = await import("@/lib/firebase")
             const locationRef = database.ref(`vehicles/${vehicleId}/current_location`)
@@ -558,6 +574,7 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
             locationHistory,
             originBranch: originBranch[0],
             destinationBranch: destBranch[0],
+            assignedCar,
             route: routeData,
             routePolyline,
             routeDistance,

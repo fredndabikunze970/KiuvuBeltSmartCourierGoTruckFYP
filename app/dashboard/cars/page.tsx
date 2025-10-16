@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiService } from "@/lib/api"
+import { getStatusColor } from "@/lib/utils"
 import { carSchema } from "@/lib/validations/management"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Car as CarIcon, Edit, Loader2, Plus, Trash } from "lucide-react"
@@ -149,18 +150,7 @@ export default function CarManagementPage() {
     })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "available":
-        return "bg-green-100 text-green-800"
-      case "in-use":
-        return "bg-blue-100 text-blue-800"
-      case "maintenance":
-        return "bg-amber-100 text-amber-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
+  // Use shared getStatusColor from lib/utils for consistent color tokens
 
   if (loading) {
     return (
@@ -300,55 +290,58 @@ export default function CarManagementPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {cars.map((car) => (
-          <div
-            key={car.car_id}
-            className="p-4 border rounded-lg shadow-sm space-y-4"
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <CarIcon className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">{car.model}</h3>
+      <div className="w-full rounded-lg border bg-card overflow-hidden">
+        {/* Header row */}
+        <div className="hidden md:grid grid-cols-12 gap-4 p-3 text-sm font-medium text-muted-foreground bg-muted/5">
+          <div className="col-span-2">Plate</div>
+          <div className="col-span-3">Model</div>
+          <div className="col-span-2">Capacity</div>
+          <div className="col-span-2">Branch</div>
+          <div className="col-span-1">Status</div>
+          <div className="col-span-2 text-right">Actions</div>
+        </div>
+
+        {/* List rows */}
+        <div className="divide-y">
+          {cars.map((car) => (
+            <div key={car.car_id} className="grid grid-cols-12 gap-4 items-center p-4 hover:bg-muted/5">
+              <div className="col-span-12 md:col-span-2 flex items-center gap-3">
+                <CarIcon className="h-5 w-5 text-primary" />
+                <div>
+                  <div className="font-semibold">{car.plate_number}</div>
+                  <div className="text-xs text-muted-foreground md:hidden">{car.model}</div>
                 </div>
-                <p className="text-sm font-mono">{car.plate_number}</p>
               </div>
-              <div className="flex space-x-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleEdit(car)}
-                >
+
+              <div className="hidden md:block col-span-3 text-sm text-foreground">{car.model}</div>
+
+              <div className="col-span-6 md:col-span-2 text-sm">
+                <div className="font-medium">{car.capacity_kg} kg</div>
+              </div>
+
+              <div className="col-span-6 md:col-span-2 text-sm">
+                <div className="font-medium">{car.branch_name}</div>
+              </div>
+
+              <div className="col-span-6 md:col-span-1 text-sm">
+                <div className="mt-1">
+                  <Badge className={`${getStatusColor(car.status)} px-3 py-1 rounded-full text-xs`}>
+                    {car.status.charAt(0).toUpperCase() + car.status.slice(1)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="col-span-6 md:col-span-2 flex justify-end items-center space-x-2">
+                <Button size="icon" variant="ghost" onClick={() => handleEdit(car)} aria-label={`Edit ${car.plate_number}`}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => handleDelete(car.car_id)}
-                >
+                <Button size="icon" variant="ghost" onClick={() => handleDelete(car.car_id)} aria-label={`Delete ${car.plate_number}`}>
                   <Trash className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Capacity</span>
-                <span className="font-medium">{car.capacity_kg} kg</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Branch</span>
-                <span className="font-medium">{car.branch_name}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Status</span>
-                <Badge className={getStatusColor(car.status)}>
-                  {car.status.charAt(0).toUpperCase() + car.status.slice(1)}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
     </DashboardLayout>

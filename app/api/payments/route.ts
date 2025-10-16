@@ -184,11 +184,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse query parameters
-    const { searchParams } = new URL(request.url)
-    const packageId = searchParams.get('packageId')
-    const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+  const { searchParams } = new URL(request.url)
+  const packageId = searchParams.get('packageId')
+  const status = searchParams.get('status')
+  const dateRange = (searchParams.get('dateRange') || 'all').toLowerCase()
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '10')
 
     let query = sql`
       SELECT
@@ -219,6 +220,21 @@ export async function GET(request: NextRequest) {
       query = sql`${query} AND p.payment_status = ${status}`
     }
 
+    // Date range filter (applies to payments.created_at)
+    // Supported values: all, today, yesterday, this_week, this_month
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') {
+        query = sql`${query} AND p.created_at >= (now() at time zone 'utc')::date AND p.created_at < ((now() at time zone 'utc')::date + INTERVAL '1 day')`
+      } else if (dateRange === 'yesterday') {
+        query = sql`${query} AND p.created_at >= ((now() at time zone 'utc')::date - INTERVAL '1 day') AND p.created_at < (now() at time zone 'utc')::date`
+      } else if (dateRange === 'this_week') {
+        // start of week (Monday) in UTC
+        query = sql`${query} AND p.created_at >= (date_trunc('week', now() at time zone 'utc')) AND p.created_at < (date_trunc('week', now() at time zone 'utc') + INTERVAL '7 days')`
+      } else if (dateRange === 'this_month') {
+        query = sql`${query} AND p.created_at >= (date_trunc('month', now() at time zone 'utc')) AND p.created_at < (date_trunc('month', now() at time zone 'utc') + INTERVAL '1 month')`
+      }
+    }
+
     // Add pagination
     query = sql`
       ${query}
@@ -246,6 +262,19 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       totalQuery = sql`${totalQuery} AND p.payment_status = ${status}`
+    }
+
+    // Mirror dateRange filter for total count
+    if (dateRange && dateRange !== 'all') {
+      if (dateRange === 'today') {
+        totalQuery = sql`${totalQuery} AND p.created_at >= (now() at time zone 'utc')::date AND p.created_at < ((now() at time zone 'utc')::date + INTERVAL '1 day')`
+      } else if (dateRange === 'yesterday') {
+        totalQuery = sql`${totalQuery} AND p.created_at >= ((now() at time zone 'utc')::date - INTERVAL '1 day') AND p.created_at < (now() at time zone 'utc')::date`
+      } else if (dateRange === 'this_week') {
+        totalQuery = sql`${totalQuery} AND p.created_at >= (date_trunc('week', now() at time zone 'utc')) AND p.created_at < (date_trunc('week', now() at time zone 'utc') + INTERVAL '7 days')`
+      } else if (dateRange === 'this_month') {
+        totalQuery = sql`${totalQuery} AND p.created_at >= (date_trunc('month', now() at time zone 'utc')) AND p.created_at < (date_trunc('month', now() at time zone 'utc') + INTERVAL '1 month')`
+      }
     }
 
     const totalResult = await totalQuery

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 import { formatPhoneNumber } from "@/lib/utils"
+import { NextRequest, NextResponse } from "next/server"
 
 function toRad(v: number) { return (v * Math.PI) / 180 }
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -47,18 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
     }
 
     // 1) Package + Payment check
-    const pkgRows = await sql<{
-      package_id: string
-      status: string
-      delivery_time: string | null
-      assigned_car: string | null
-      assigned_driver: string | null
-      origin_branch_id: string
-      destination_branch_id: string
-      sender_phone: string
-      receiver_phone: string
-      payment_status: string | null
-    }[]>`
+    const pkgRows = await sql`
       SELECT 
         p.package_id,
         p.status,
@@ -83,15 +72,13 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
       return NextResponse.json({ success: false, error: "Payment not confirmed" }, { status: 400 })
     }
 
+    // Block tracking updates if package is already delivered/arrived
+    if (pkg.status === 'delivered' || pkg.status === 'arrived') {
+      return NextResponse.json({ success: false, error: 'Package already delivered/arrived. Tracking updates are not allowed.' }, { status: 400 })
+    }
+
     // 2) Branch coordinates
-    const branchRows = await sql<{
-      origin_name: string
-      origin_lat: number
-      origin_lng: number
-      destination_name: string
-      dest_lat: number
-      dest_lng: number
-    }[]>`
+    const branchRows = await sql`
       SELECT 
         origin.branch_name as origin_name,
         origin.latitude as origin_lat,
@@ -110,14 +97,7 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
     }
 
     // 3) Latest tracking with GPS
-    const tRows = await sql<{
-      latitude: number | null
-      longitude: number | null
-      location_name: string | null
-      status: string
-      progress_percentage: number
-      created_at: string
-    }[]>`
+    const tRows = await sql`
       SELECT 
         latitude, longitude, location_name, status, progress_percentage, created_at
       FROM tracking
@@ -163,7 +143,10 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
     // 5) Progress calculation (approx straight-line)
     const totalKm = haversine(branch.origin_lat, branch.origin_lng, branch.dest_lat, branch.dest_lng)
     const traveledKm = haversine(branch.origin_lat, branch.origin_lng, latest.latitude, latest.longitude)
-    const progress = totalKm > 0 ? Math.min(100, Math.round((traveledKm / totalKm) * 100)) : 0
+  let progress = totalKm > 0 ? Math.min(100, Math.round((traveledKm / totalKm) * 100)) : 0
+  // Clamp progress and ensure integer 0..100
+  if (progress > 100) progress = 100
+  if (progress < 0) progress = 0
 
     // 6) Update tracking progress entry
     try {
@@ -173,8 +156,8 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
         ) VALUES (
           ${packageId},
           ${pkg.status === 'registered' ? 'in_transit' : pkg.status},
-          ${latest.location_name || 'GPS update'},
-          ${progress},
+            ${latest.location_name || 'GPS update'},
+            ${progress},
           ${offRoute ? 'Off-route detected' : 'On-route update'},
           'system',
           ${latest.latitude},
@@ -185,21 +168,70 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
       console.error("Failed to insert progress tracking entry:", e)
     }
 
-    // 7) SMS alerts for off-route (best-effort)
+    // 7) Alerts: off-route alerts remain (best-effort). Additionally,
+    // send arrival notifications only when progress reaches 100%.
     if (offRoute) {
       const msg = `ALERT: Package ${packageId} vehicle is off route. Deviation: ${deviationKm.toFixed(2)}km`
       try {
         if (pkg.sender_phone) {
-          const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone);
+          const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone)
           await sendSMS({ to: formattedSenderPhone, message: msg })
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to send off-route SMS to sender:', err)
+      }
       try {
         if (pkg.receiver_phone) {
-          const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone);
+          const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone)
           await sendSMS({ to: formattedReceiverPhone, message: msg })
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to send off-route SMS to receiver:', err)
+      }
+    }
+
+    // 8) Arrival handling: when progress is 100% mark package as arrived and notify parties once
+    if (progress === 100) {
+      try {
+        // Only perform status update and notifications if package isn't already marked arrived
+        if (pkg.status !== 'arrived') {
+          await sql`
+            UPDATE packages
+            SET status = 'arrived', updated_at = NOW()
+            WHERE package_id = ${packageId}
+          `
+
+          // Ensure tracking records reflect full delivery (set any lower progress to 100)
+          await sql`
+            UPDATE tracking
+            SET progress_percentage = 100
+            WHERE package_id = ${packageId} AND (progress_percentage IS NULL OR progress_percentage < 100)
+          `
+
+          // Compose professional arrival message
+          const arrivalMsg = `KIVU Belt Express: Package ${packageId} has arrived at its destination. Thank you for choosing KIVU Belt Express.`
+
+          if (pkg.sender_phone) {
+            try {
+              const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone)
+              await sendSMS({ to: formattedSenderPhone, message: arrivalMsg })
+            } catch (err) {
+              console.error('Failed to send arrival SMS to sender:', err)
+            }
+          }
+
+          if (pkg.receiver_phone) {
+            try {
+              const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone)
+              await sendSMS({ to: formattedReceiverPhone, message: arrivalMsg })
+            } catch (err) {
+              console.error('Failed to send arrival SMS to receiver:', err)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Arrival handling failed:', err)
+      }
     }
 
     return NextResponse.json({

@@ -26,12 +26,14 @@ export function formatPhoneNumber(phone: string): string {
   return phone
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount?: number | string | null): string {
+  const num = typeof amount === "number" ? amount : Number(amount)
+  const value = typeof num === "number" && !Number.isNaN(num) ? num : 0
   return new Intl.NumberFormat("en-RW", {
     style: "currency",
     currency: "RWF",
     minimumFractionDigits: 0,
-  }).format(amount)
+  }).format(value)
 }
 
 export function getStatusColor(status: string): string {

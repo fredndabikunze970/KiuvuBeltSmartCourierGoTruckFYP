@@ -153,6 +153,7 @@ class ApiService {
     agent_id?: string
     page?: number
     limit?: number
+    dateRange?: string
   }): Promise<{
     packages: Package[]
     pagination: {
@@ -413,9 +414,42 @@ class ApiService {
     })
   }
 
-  async confirmPayment(paymentId: string): Promise<{ message: string; paymentId: string; confirmedBy: string }> {
+  // List/fetch payments with optional filters and dateRange
+  async getPayments(params?: {
+    packageId?: string
+    status?: string
+    page?: number
+    limit?: number
+    dateRange?: string
+  }): Promise<{
+    payments: Payment[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      pages: number
+    }
+  }> {
+    const searchParams = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, value.toString())
+        }
+      })
+    }
+
+    const query = searchParams.toString()
+    return this.request(`/payments${query ? `?${query}` : ""}`)
+  }
+
+  async confirmPayment(
+    paymentId: string,
+    paymentMethod: "cash" | "mobile_money" | "bank_transfer" = "cash",
+  ): Promise<{ message: string; paymentId: string; confirmedBy: string }> {
     return this.request(`/payments/${paymentId}/confirm`, {
       method: "PUT",
+      body: JSON.stringify({ payment_method: paymentMethod }),
     })
   }
 

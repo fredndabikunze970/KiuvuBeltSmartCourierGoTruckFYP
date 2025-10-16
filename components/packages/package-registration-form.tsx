@@ -46,14 +46,14 @@ interface PackageFormData {
   assignedCarId: string
   assignedDriverId: string
   deliveryTime: string
+  paymentMethod?: "cash" | "mobile_money" | "bank_transfer"
+  transactionReference?: string
 }
 
 const steps = [
-  { id: 1, title: "Sender", icon: User },
-  { id: 2, title: "Receiver", icon: User },
-  { id: 3, title: "Package", icon: Package },
-  { id: 4, title: "Delivery", icon: DollarSign },
-  { id: 5, title: "Review", icon: CheckCircle2 },
+  { id: 1, title: "Sender & Receiver", icon: User },
+  { id: 2, title: "Package & Delivery", icon: Package },
+  { id: 3, title: "Review", icon: CheckCircle2 },
 ]
 
 export function PackageRegistrationForm() {
@@ -79,6 +79,9 @@ export function PackageRegistrationForm() {
     assignedCarId: "",
     assignedDriverId: "",
     deliveryTime: ""
+    ,
+    paymentMethod: "cash",
+    transactionReference: ""
   })
 
   const [loading, setLoading] = useState(false)
@@ -161,14 +164,33 @@ export function PackageRegistrationForm() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.senderName && formData.senderPhone && formData.senderAddress)
+        // Validate both sender and receiver in the combined first step
+        return !!(
+          formData.senderName &&
+          formData.senderPhone &&
+          formData.senderAddress &&
+          formData.receiverName &&
+          formData.receiverPhone &&
+          formData.receiverAddress
+        )
       case 2:
-        return !!(formData.receiverName && formData.receiverPhone && formData.receiverAddress)
-      case 3:
-        return !!(formData.packageDescription && formData.weight)
-      case 4:
-        return !!(formData.deliveryFee && formData.priority && formData.deliveryTime && formData.originBranchId && formData.destinationBranchId)
+        // Validate package details and delivery options together
+        return !!(
+          formData.packageDescription &&
+          formData.weight &&
+          formData.deliveryFee &&
+          formData.priority &&
+          formData.deliveryTime &&
+          formData.originBranchId &&
+          formData.destinationBranchId
+        )
       default:
+        // For the final review step, require a transaction reference when the selected
+        // payment method is not cash. Cash payments don't need a reference.
+        if (formData.paymentMethod && formData.paymentMethod !== 'cash') {
+          return !!formData.transactionReference
+        }
+
         return true
     }
   }
@@ -197,9 +219,37 @@ export function PackageRegistrationForm() {
         assignedCarId: formData.assignedCarId || undefined,
         assignedDriverId: formData.assignedDriverId || undefined,
         deliveryTime: formData.deliveryTime ? new Date(formData.deliveryTime).toISOString() : undefined
+        ,
+        // Include payment info so backend can create payment record during registration
+        paymentMethod: formData.paymentMethod || 'cash',
+        transactionReference: formData.transactionReference || undefined,
       }
 
       const response = await apiService.registerPackage(packageData)
+
+      // If backend returned a payment record and the chosen method is cash, auto-confirm it
+      try {
+        const payment = (response as any).payment
+        if (payment && payment.payment_id) {
+          const method = formData.paymentMethod || 'cash'
+
+          // Auto-confirm cash payments immediately. For non-cash methods confirm only
+          // if the user provided a transaction reference (to avoid accidental 400s).
+          if (method === 'cash') {
+            await apiService.confirmPayment(payment.payment_id, method)
+            toast({ title: 'Payment confirmed', description: 'Cash payment has been recorded and confirmed.' })
+          } else if (formData.transactionReference) {
+            await apiService.confirmPayment(payment.payment_id, method)
+            toast({ title: 'Payment submitted', description: 'Payment has been recorded and is pending verification.' })
+          } else {
+            // Non-fatal: user chose a non-cash method but didn't provide reference.
+            toast({ title: 'Payment pending', description: 'Please provide a transaction reference to confirm non-cash payments.' })
+          }
+        }
+      } catch (e) {
+        // non-fatal: log and continue
+        console.warn('Auto-confirm payment failed', e)
+      }
 
       setSuccess({
         packageId: response.package.package_id,
@@ -229,7 +279,9 @@ export function PackageRegistrationForm() {
         priority: "normal",
         assignedCarId: "",
         assignedDriverId: "",
-        deliveryTime: ""
+        deliveryTime: "",
+        paymentMethod: 'cash',
+        transactionReference: ''
       })
       setCurrentStep(1)
     } catch (err) {
@@ -338,101 +390,66 @@ export function PackageRegistrationForm() {
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
+        // Combined Sender & Receiver
         return (
           <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Sender Information</h3>
-              <p className="text-muted-foreground text-sm mt-1">Enter sender details</p>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Sender & Receiver</h3>
+              <p className="text-muted-foreground text-sm mt-1">Enter sender and receiver details</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
-                <Label htmlFor="senderName" className="text-sm font-semibold">
-                  Full Name *
-                </Label>
+                <Label htmlFor="senderName" className="text-sm font-semibold">Full Name *</Label>
                 <Input
                   id="senderName"
                   value={formData.senderName}
                   onChange={(e) => handleInputChange("senderName", e.target.value)}
-                  placeholder="John Doe"
+                  placeholder="Enter Name Of Sender"
                   required
                   disabled={loading}
                   className="h-10 w-full"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="senderPhone" className="text-sm font-semibold">
-                  Phone Number *
-                </Label>
+                <Label htmlFor="receiverName" className="text-sm font-semibold">Full Name *</Label>
+                <Input
+                  id="receiverName"
+                  value={formData.receiverName}
+                  onChange={(e) => handleInputChange("receiverName", e.target.value)}
+                  placeholder="Enter Name Of Receiver"
+                  required
+                  disabled={loading}
+                  className="h-10 w-full"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="senderPhone" className="text-sm font-semibold">Phone Number *</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="senderPhone"
                     value={formData.senderPhone}
                     onChange={(e) => handleInputChange("senderPhone", e.target.value)}
-                    placeholder="+250788123456"
+                    placeholder="+2507xxxxx"
                     className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="senderAddress" className="text-sm font-semibold">
-                Complete Address *
-              </Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Textarea
-                  id="senderAddress"
-                  value={formData.senderAddress}
-                  onChange={(e) => handleInputChange("senderAddress", e.target.value)}
-                  placeholder="Street address, city, district"
-                  className="pl-9 min-h-[80px] w-full"
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          </div>
-        )
-
-      case 2:
-        return (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Receiver Information</h3>
-              <p className="text-muted-foreground text-sm mt-1">Enter recipient details</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
-                <Label htmlFor="receiverName" className="text-sm font-semibold">
-                  Full Name *
-                </Label>
-                <Input
-                  id="receiverName"
-                  value={formData.receiverName}
-                  onChange={(e) => handleInputChange("receiverName", e.target.value)}
-                  placeholder="Jane Smith"
-                  required
-                  disabled={loading}
-                  className="h-10 w-full"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="receiverPhone" className="text-sm font-semibold">
-                  Phone Number *
-                </Label>
+                <Label htmlFor="receiverPhone" className="text-sm font-semibold">Phone Number *</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="receiverPhone"
                     value={formData.receiverPhone}
                     onChange={(e) => handleInputChange("receiverPhone", e.target.value)}
-                    placeholder="+250788654321"
+                    placeholder="+2507xxxxx"
                     className="pl-9 h-10 w-full"
                     required
                     disabled={loading}
@@ -441,38 +458,52 @@ export function PackageRegistrationForm() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="receiverAddress" className="text-sm font-semibold">
-                Complete Address *
-              </Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Textarea
-                  id="receiverAddress"
-                  value={formData.receiverAddress}
-                  onChange={(e) => handleInputChange("receiverAddress", e.target.value)}
-                  placeholder="Street address, city, district"
-                  className="pl-9 min-h-[80px] w-full"
-                  required
-                  disabled={loading}
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="senderAddress" className="text-sm font-semibold">Complete Address *</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Textarea
+                    id="senderAddress"
+                    value={formData.senderAddress}
+                    onChange={(e) => handleInputChange("senderAddress", e.target.value)}
+                    placeholder="Street address, city, district"
+                    className="pl-9 min-h-[80px] w-full"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receiverAddress" className="text-sm font-semibold">Complete Address *</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Textarea
+                    id="receiverAddress"
+                    value={formData.receiverAddress}
+                    onChange={(e) => handleInputChange("receiverAddress", e.target.value)}
+                    placeholder="Street address, city, district"
+                    className="pl-9 min-h-[80px] w-full"
+                    required
+                    disabled={loading}
+                  />
+                </div>
               </div>
             </div>
           </div>
         )
 
-      case 3:
+      case 2:
+        // Combined Package & Delivery
         return (
           <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Package Details</h3>
-              <p className="text-muted-foreground text-sm mt-1">Describe package contents</p>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Package & Delivery</h3>
+              <p className="text-muted-foreground text-sm mt-1">Describe package and choose delivery options</p>
             </div>
 
             <div className="space-y-3">
-              <Label htmlFor="packageDescription" className="text-sm font-semibold">
-                Package Description *
-              </Label>
+              <Label htmlFor="packageDescription" className="text-sm font-semibold">Package Description *</Label>
               <Textarea
                 id="packageDescription"
                 value={formData.packageDescription}
@@ -486,9 +517,7 @@ export function PackageRegistrationForm() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               <div className="space-y-2">
-                <Label htmlFor="weight" className="text-sm font-semibold">
-                  Weight (kg) *
-                </Label>
+                <Label htmlFor="weight" className="text-sm font-semibold">Weight (kg) *</Label>
                 <div className="relative">
                   <Weight className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -505,9 +534,7 @@ export function PackageRegistrationForm() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dimensions" className="text-sm font-semibold">
-                  Dimensions
-                </Label>
+                <Label htmlFor="dimensions" className="text-sm font-semibold">Dimensions</Label>
                 <div className="relative">
                   <Ruler className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -521,9 +548,7 @@ export function PackageRegistrationForm() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="declaredValue" className="text-sm font-semibold">
-                  Value (RWF)
-                </Label>
+                <Label htmlFor="declaredValue" className="text-sm font-semibold">Value (RWF)</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -538,22 +563,10 @@ export function PackageRegistrationForm() {
                 </div>
               </div>
             </div>
-          </div>
-        )
 
-      case 4:
-        return (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="text-center mb-4">
-              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Delivery Options</h3>
-              <p className="text-muted-foreground text-sm mt-1">Choose delivery preferences</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="originBranchId" className="text-sm font-semibold flex items-center">
-                  Origin Branch <span className="text-red-500 ml-1">*</span>
-                </Label>
+                <Label htmlFor="originBranchId" className="text-sm font-semibold flex items-center">Origin Branch <span className="text-red-500 ml-1">*</span></Label>
                 <Select value={formData.originBranchId} onValueChange={(value) => handleInputChange("originBranchId", value)}>
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select origin branch" />
@@ -568,9 +581,7 @@ export function PackageRegistrationForm() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="destinationBranchId" className="text-sm font-semibold flex items-center">
-                  Destination Branch <span className="text-red-500 ml-1">*</span>
-                </Label>
+                <Label htmlFor="destinationBranchId" className="text-sm font-semibold flex items-center">Destination Branch <span className="text-red-500 ml-1">*</span></Label>
                 <Select value={formData.destinationBranchId} onValueChange={(value) => handleInputChange("destinationBranchId", value)}>
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select destination branch" />
@@ -588,9 +599,7 @@ export function PackageRegistrationForm() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="assignedCarId" className="text-sm font-semibold">
-                  Assign Vehicle <span className="text-gray-500 text-xs">(Optional)</span>
-                </Label>
+                <Label htmlFor="assignedCarId" className="text-sm font-semibold">Assign Vehicle <span className="text-gray-500 text-xs">(Optional)</span></Label>
                 <Select value={formData.assignedCarId} onValueChange={(value) => handleInputChange("assignedCarId", value)}>
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select vehicle" />
@@ -605,9 +614,7 @@ export function PackageRegistrationForm() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="assignedDriverId" className="text-sm font-semibold">
-                  Assign Driver <span className="text-gray-500 text-xs">(Optional)</span>
-                </Label>
+                <Label htmlFor="assignedDriverId" className="text-sm font-semibold">Assign Driver <span className="text-gray-500 text-xs">(Optional)</span></Label>
                 <Select value={formData.assignedDriverId} onValueChange={(value) => handleInputChange("assignedDriverId", value)}>
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select driver" />
@@ -625,9 +632,7 @@ export function PackageRegistrationForm() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="priority" className="text-sm font-semibold flex items-center">
-                  Delivery Priority <span className="text-red-500 ml-1">*</span>
-                </Label>
+                <Label htmlFor="priority" className="text-sm font-semibold flex items-center">Delivery Priority <span className="text-red-500 ml-1">*</span></Label>
                 <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue />
@@ -655,9 +660,7 @@ export function PackageRegistrationForm() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="deliveryFee" className="text-sm font-semibold flex items-center">
-                  Delivery Fee (RWF) <span className="text-red-500 ml-1">*</span>
-                </Label>
+                <Label htmlFor="deliveryFee" className="text-sm font-semibold flex items-center">Delivery Fee (RWF) <span className="text-red-500 ml-1">*</span></Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -676,9 +679,7 @@ export function PackageRegistrationForm() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="deliveryTime" className="text-sm font-semibold flex items-center">
-                  Delivery Time <span className="text-red-500 ml-1">*</span>
-                </Label>
+                <Label htmlFor="deliveryTime" className="text-sm font-semibold flex items-center">Delivery Time <span className="text-red-500 ml-1">*</span></Label>
                 <Input
                   id="deliveryTime"
                   type="datetime-local"
@@ -693,14 +694,13 @@ export function PackageRegistrationForm() {
 
             <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
               <h4 className="font-semibold text-blue-900 text-sm mb-1">Delivery Timeline</h4>
-              <p className="text-blue-700 text-xs">
-                Based on your priority selection. Express and Urgent deliveries may incur additional charges.
-              </p>
+              <p className="text-blue-700 text-xs">Based on your priority selection. Express and Urgent deliveries may incur additional charges.</p>
             </div>
           </div>
         )
 
-      case 5:
+      case 3:
+        // Review & Confirm
         return (
           <div className="space-y-4 sm:space-y-6">
             <div className="text-center mb-4">
@@ -763,6 +763,40 @@ export function PackageRegistrationForm() {
                   <div><strong>Priority:</strong> <span className="capitalize">{formData.priority}</span></div>
                   <div><strong>Fee:</strong> RWF {formData.deliveryFee}</div>
                   <div><strong>Delivery Time:</strong> {formData.deliveryTime ? new Date(formData.deliveryTime).toLocaleString() : "Not specified"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-amber-50/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-amber-600" />
+                    Payment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Payment Method</Label>
+                    <Select value={formData.paymentMethod} onValueChange={(v) => handleInputChange('paymentMethod' as any, v)}>
+                      <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select payment method" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash (pay at branch)</SelectItem>
+                        <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.paymentMethod && formData.paymentMethod !== 'cash' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Transaction Reference</Label>
+                      <Input
+                        value={formData.transactionReference}
+                        onChange={(e) => handleInputChange('transactionReference' as any, e.target.value)}
+                        placeholder="Enter transaction reference from your payment"
+                        className="h-10 w-full"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

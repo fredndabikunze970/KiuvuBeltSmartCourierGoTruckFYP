@@ -71,6 +71,7 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
   const [statusFilter, setStatusFilter] = useState("all")
+  const [dateRange, setDateRange] = useState<string>("all")
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
     limit: 10,
@@ -103,6 +104,12 @@ export default function PaymentsPage() {
     fetchPayments()
   }, [statusFilter, debouncedSearchTerm])
 
+  // refetch when dateRange changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchPayments()
+  }, [dateRange])
+
   useEffect(() => {
     if (authService.isAuthenticated()) {
       fetchPayments()
@@ -119,6 +126,10 @@ export default function PaymentsPage() {
 
       if (statusFilter !== "all") {
         queryParams.append("status", statusFilter)
+      }
+
+      if (dateRange && dateRange !== 'all') {
+        queryParams.append('dateRange', dateRange)
       }
 
       if (searchTerm && searchTerm.match(/^PKG-/)) {
@@ -251,12 +262,13 @@ export default function PaymentsPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount?: number | null) => {
+    const value = typeof amount === 'number' && !Number.isNaN(amount) ? amount : 0
     return new Intl.NumberFormat('en-RW', {
       style: 'currency',
       currency: 'RWF',
       minimumFractionDigits: 0,
-    }).format(amount)
+    }).format(value)
   }
 
   const formatDate = (dateString: string) => {
@@ -268,6 +280,43 @@ export default function PaymentsPage() {
       minute: '2-digit'
     })
   }
+
+  // Client-side date filter helper (used for immediate UI filtering)
+  const inDateRange = (createdAt: string, range: string) => {
+    if (!createdAt) return false
+    const d = new Date(createdAt)
+    const startOfDay = (dt: Date) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
+
+    const todayStart = startOfDay(new Date())
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1)
+    const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - ((todayStart.getDay() + 6) % 7))
+    const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1)
+
+    switch (range) {
+      case 'today':
+        return d >= todayStart
+      case 'yesterday':
+        return d >= yesterdayStart && d < todayStart
+      case 'this_week':
+        return d >= weekStart
+      case 'this_month':
+        return d >= monthStart
+      case 'all':
+      default:
+        return true
+    }
+  }
+
+  // derive displayedPayments for client-side filtering
+  // displayedPayments applies the current search, status and dateRange filters locally
+  // so the UI responds instantly while pagination is still driven by the server.
+  const displayedPayments = payments.filter(p => {
+    const q = debouncedSearchTerm.trim().toLowerCase()
+    const matchesText = !q || p.payment_id.toLowerCase().includes(q) || p.package_id.toLowerCase().includes(q) || (p.transaction_reference || '').toLowerCase().includes(q)
+    const matchesStatus = statusFilter === 'all' ? true : p.payment_status === statusFilter
+    const matchesDate = dateRange === 'all' ? true : inDateRange(p.created_at, dateRange)
+    return matchesText && matchesStatus && matchesDate
+  })
 
   if (loading) {
     return (
@@ -306,6 +355,8 @@ export default function PaymentsPage() {
           </div>
 
           {/* Stats Cards */}
+          {/* stats cards use the client-side filtered list (computed above) */}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
               <CardContent className="p-6">
@@ -313,7 +364,7 @@ export default function PaymentsPage() {
                   <div>
                     <p className="text-sm font-medium text-blue-600">Total Payments</p>
                     <p className="text-2xl font-bold text-blue-900 mt-1">
-                      {payments.length}
+                      {displayedPayments.length}
                     </p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-full">
@@ -329,7 +380,7 @@ export default function PaymentsPage() {
                   <div>
                     <p className="text-sm font-medium text-yellow-600">Pending</p>
                     <p className="text-2xl font-bold text-yellow-900 mt-1">
-                      {payments.filter(p => p.payment_status === 'pending').length}
+                      {displayedPayments.filter(p => p.payment_status === 'pending').length}
                     </p>
                   </div>
                   <div className="p-3 bg-yellow-100 rounded-full">
@@ -345,7 +396,7 @@ export default function PaymentsPage() {
                   <div>
                     <p className="text-sm font-medium text-green-600">Confirmed</p>
                     <p className="text-2xl font-bold text-green-900 mt-1">
-                      {payments.filter(p => p.payment_status === 'confirmed').length}
+                      {displayedPayments.filter(p => p.payment_status === 'confirmed').length}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-full">
@@ -362,7 +413,13 @@ export default function PaymentsPage() {
                     <p className="text-sm font-medium text-red-600">Total Amount</p>
                     <p className="text-2xl font-bold text-red-900 mt-1">
                       {formatCurrency(
-                        payments.reduce((sum, p) => sum + (p.payment_status === 'confirmed' ? p.amount : 0), 0)
+                        displayedPayments.reduce((sum, p) => {
+                          const amt = Number(p.amount)
+                          if (p.payment_status === 'confirmed' && !Number.isNaN(amt)) {
+                            return sum + amt
+                          }
+                          return sum
+                        }, 0)
                       )}
                     </p>
                   </div>
@@ -403,6 +460,22 @@ export default function PaymentsPage() {
                       <option value="failed">Failed</option>
                     </select>
                   </div>
+                    <div className="flex items-center gap-2 px-3 py-2 border rounded-md w-full sm:w-auto">
+                      <Filter className="w-4 h-4 text-gray-400" />
+                      <select
+                        value={dateRange}
+                        onChange={(e) => setDateRange(e.target.value)}
+                        className="bg-transparent border-none outline-none text-sm w-full"
+                        aria-label="Filter payments by date range"
+                        title="Date range filter"
+                      >
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="this_week">This Week</option>
+                        <option value="this_month">This Month</option>
+                      </select>
+                    </div>
                   <Button variant="outline" onClick={fetchPayments} className="w-full sm:w-auto">
                     Refresh
                   </Button>
@@ -426,14 +499,14 @@ export default function PaymentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {payments.length === 0 ? (
+                    {displayedPayments.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-gray-500">
                           No payments found matching your criteria
                         </td>
                       </tr>
                     ) : (
-                      payments.map((payment) => (
+                      displayedPayments.map((payment) => (
                         <tr key={payment.payment_id} className="border-b hover:bg-gray-50">
                           <td className="p-4">
                             <div className="space-y-2">
@@ -511,7 +584,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* Pagination */}
-              {payments.length > 0 && (
+              {displayedPayments.length > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4">
                   <div className="text-sm text-gray-700">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}

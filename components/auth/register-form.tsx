@@ -2,15 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useAuth } from "@/hooks/use-auth"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react"
+import { useState } from "react"
 
 export function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -89,7 +89,7 @@ export function RegisterForm() {
               <Input
                 id="fullName"
                 type="text"
-                placeholder="John Doe"
+                placeholder="XXXX"
                 value={formData.fullName}
                 onChange={(e) => handleInputChange("fullName", e.target.value)}
                 className="pl-10 w-full"
@@ -106,7 +106,7 @@ export function RegisterForm() {
               <Input
                 id="email"
                 type="email"
-                placeholder="john@kivubelt.com"
+                placeholder="xxx@kivubelt.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 className="pl-10 w-full"

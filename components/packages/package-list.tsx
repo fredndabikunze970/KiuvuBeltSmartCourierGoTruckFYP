@@ -84,6 +84,7 @@ export function PackageList() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [dateRange, setDateRange] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const { user } = useAuth()
@@ -99,6 +100,9 @@ export function PackageList() {
       if (statusFilter !== "all") {
         params.status = statusFilter
       }
+      if (dateRange && dateRange !== 'all') {
+        params.dateRange = dateRange
+      }
 
       const response = await apiService.getPackages(params)
       setPackages(response.packages)
@@ -112,13 +116,43 @@ export function PackageList() {
 
   useEffect(() => {
     fetchPackages()
-  }, [currentPage, statusFilter])
+  }, [currentPage, statusFilter, dateRange])
+
+  const inDateRange = (createdAt: string, range: string) => {
+    if (!createdAt) return false
+    const d = new Date(createdAt)
+    const startOfDay = (dt: Date) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
+
+    const todayStart = startOfDay(new Date())
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1)
+    const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - ((todayStart.getDay() + 6) % 7)) // Monday as start
+    const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1)
+
+    switch (range) {
+      case 'today':
+        return d >= todayStart
+      case 'yesterday':
+        return d >= yesterdayStart && d < todayStart
+      case 'this_week':
+        return d >= weekStart
+      case 'this_month':
+        return d >= monthStart
+      case 'all':
+      default:
+        return true
+    }
+  }
 
   const filteredPackages = packages.filter(
-    (pkg) =>
-      pkg.package_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.sender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.receiver_name.toLowerCase().includes(searchTerm.toLowerCase()),
+    (pkg) => {
+      const q = searchTerm.toLowerCase()
+      const matchesText =
+        pkg.package_id.toLowerCase().includes(q) ||
+        pkg.sender_name.toLowerCase().includes(q) ||
+        pkg.receiver_name.toLowerCase().includes(q)
+      const matchesDate = dateRange === 'all' ? true : inDateRange(pkg.created_at, dateRange)
+      return matchesText && matchesDate
+    }
   )
 
   const formatDate = (dateString: string) => {
@@ -186,7 +220,8 @@ export function PackageList() {
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-48 h-11 bg-white/80 backdrop-blur-sm">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -199,7 +234,21 @@ export function PackageList() {
                 <SelectItem value="delivered">✅ Delivered</SelectItem>
                 <SelectItem value="cancelled">❌ Cancelled</SelectItem>
               </SelectContent>
-            </Select>
+              </Select>
+
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-full sm:w-40 h-11 bg-white/80 backdrop-blur-sm">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
