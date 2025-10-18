@@ -1,0 +1,60 @@
+flowchart TB
+  %% Processes
+  subgraph SYS[KIVU Belt Smart Courier System]
+    P1[1.0 Package Registration & Payments]
+    P2[2.0 Package Assignment & Routing]
+    P3[3.0 Tracking & Monitoring]
+    P4[4.0 Notifications & Alerts]
+    P5[5.0 Reporting & Admin]
+  end
+
+  %% External actors
+  CU[Customer<br/>Sender / Receiver]
+  AG[Agent]
+  ADM[Admin]
+  SMSP[SMS Provider / Twilio]
+  LOCATIONIQ[LocationIQ]
+
+  %% Data stores
+  DB[(Postgres DB)]
+  FB[(Firebase Realtime DB)]
+
+  %% Flows: Customers & Agents interact
+  CU -->|Submit package + payment info| P1
+  AG -->|Register package & confirm cash payments| P1
+
+  %% P1 writes to DB
+  P1 -->|package, payment records| DB
+  P1 -->|enqueue notification| P4
+
+  %% Assignment & routing
+  P2 -->|update assignment| DB
+  P2 -->|vehicle location write| FB
+  AG -->|assign vehicle, set driver| P2
+  P1 -->|new package triggers routing| P2
+
+  %% Tracking
+  FB -->|live GPS updates| P3
+  P3 -->|compute progress| DB
+  P3 -->|if off-route| P4
+  P3 -->|if arrived (100%)| P4 & DB
+
+  %% Notifications
+  P4 -->|SMS / Notification records| SMSP
+  P4 -->|notification DB records| DB
+
+  %% Reporting
+  ADM -->|request reports| P5
+  P5 -->|read payments/packages/tracking| DB
+  P5 -->|generate Export (PDF/CSV)| ADM
+
+  %% External services
+  P2 -->|route geometry| LOCATIONIQ
+  P3 -->|route geometry| LOCATIONIQ
+
+  style P1 fill:#eff6ff,stroke:#1e40af
+  style P2 fill:#fff7ed,stroke:#ea580c
+  style P3 fill:#f0fdf4,stroke:#16a34a
+  style P4 fill:#fffbeb,stroke:#f59e0b
+  style P5 fill:#f8fafc,stroke:#0ea5e9
+

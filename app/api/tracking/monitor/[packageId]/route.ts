@@ -204,8 +204,9 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
           // Ensure tracking records reflect full delivery (set any lower progress to 100)
           await sql`
             UPDATE tracking
-            SET progress_percentage = 100
-            WHERE package_id = ${packageId} AND (progress_percentage IS NULL OR progress_percentage < 100)
+            SET progress_percentage = 100,
+                status = 'arrived'
+            WHERE package_id = ${packageId} AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
           `
 
           // Compose arrival messages. For Twilio trial accounts it's common to include a trial prefix
@@ -246,11 +247,21 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
       }
     }
 
+    // Re-fetch latest tracking row so we return the normalized arrival values when applicable
+    const refreshedRows = await sql`
+      SELECT latitude, longitude, location_name, status, progress_percentage, created_at
+      FROM tracking
+      WHERE package_id = ${packageId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `
+    const refreshedLatest = refreshedRows?.[0] || latest
+
     return NextResponse.json({
       success: true,
       package: pkg,
       branches: branch,
-      latestTracking: latest,
+      latestTracking: refreshedLatest,
       route,
       deviationKm,
       offRoute,

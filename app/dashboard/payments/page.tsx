@@ -274,6 +274,90 @@ export default function PaymentsPage() {
     })
   }
 
+  // Export payments as a structured PDF report. Dynamically imports pdfmake to avoid bundling on server.
+  async function exportPaymentsReport() {
+    try {
+      // Load pdfmake via CDN at runtime to avoid bundler/module resolution during SSR/build
+      const ensureScript = (src: string) => new Promise<void>((resolve, reject) => {
+        if (typeof window === 'undefined') return reject(new Error('Client-only'))
+        const existing = document.querySelector(`script[src="${src}"]`)
+        if (existing) return resolve()
+        const s = document.createElement('script')
+        s.src = src
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = (e) => reject(new Error(`Failed to load script ${src}`))
+        document.head.appendChild(s)
+      })
+
+      // pdfmake CDN assets (version pinned)
+      const pdfMakeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js'
+      const vfsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js'
+
+      await ensureScript(pdfMakeUrl)
+      await ensureScript(vfsUrl)
+
+      // @ts-ignore
+      const pdfMake: any = (window as any).pdfMake
+      if (!pdfMake) throw new Error('pdfMake not available')
+
+      const header = [
+        [{ text: 'Payment ID', style: 'tableHeader' }, { text: 'Package ID', style: 'tableHeader' }, { text: 'Amount (RWF)', style: 'tableHeader' }, { text: 'Method', style: 'tableHeader' }, { text: 'Status', style: 'tableHeader' }, { text: 'Created At', style: 'tableHeader' }]
+      ]
+
+      const body = payments.map(p => [
+        p.payment_id,
+        p.package_id,
+        formatCurrency(p.amount),
+        p.payment_method,
+        p.payment_status,
+        formatDate(p.created_at)
+      ])
+
+      const tableBody = [...header, ...body]
+
+      const totalConfirmed = payments.reduce((sum, p) => p.payment_status === 'confirmed' ? sum + Number(p.amount || 0) : sum, 0)
+
+      const docDefinition: any = {
+        info: {
+          title: 'Payments Report',
+          author: 'KIVU Belt Express',
+        },
+        pageSize: 'A4',
+        pageMargins: [40, 60, 40, 60],
+        content: [
+          { text: 'KIVU Belt Express', style: 'title' },
+          { text: 'Payments Report', style: 'subtitle' },
+          { text: `Generated: ${new Date().toLocaleString()}`, style: 'meta' },
+          { text: '\n' },
+          {
+            table: {
+              headerRows: 1,
+              widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'],
+              body: tableBody
+            }
+          },
+          { text: '\n' },
+          { text: `Total confirmed amount: ${formatCurrency(totalConfirmed)}`, style: 'total' }
+        ],
+        styles: {
+          title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
+          subtitle: { fontSize: 14, margin: [0, 0, 0, 6] },
+          meta: { fontSize: 10, color: 'gray' },
+          tableHeader: { bold: true, fontSize: 10, color: 'black' },
+          total: { bold: true, fontSize: 12, margin: [0, 6, 0, 0] }
+        }
+      }
+
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition)
+      // download directly
+      pdfDocGenerator.download(`payments-report-${new Date().toISOString().slice(0,10)}.pdf`)
+    } catch (err) {
+      console.error('Failed to export payments report:', err)
+      alert('Failed to export payments report. Please try again later.')
+    }
+  }
+
   if (loading) {
     return (
       <ProtectedRoute allowedRoles={["admin", "agent"]}>
@@ -304,10 +388,12 @@ export default function PaymentsPage() {
               <h1 className="text-3xl font-bold text-gray-900">Payment Management</h1>
               <p className="text-gray-600 mt-1">Manage and confirm package payments</p>
             </div>
-            <Button className="flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export Report
-            </Button>
+            <div className="flex gap-2">
+              <Button className="flex items-center gap-2" onClick={() => exportPaymentsReport()}>
+                <Download className="w-4 h-4" />
+                Export Report
+              </Button>
+            </div>
           </div>
 
           {/* Stats Cards */}

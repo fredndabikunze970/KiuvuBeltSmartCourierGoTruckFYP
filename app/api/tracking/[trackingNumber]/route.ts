@@ -46,6 +46,15 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
         const packageData = packageResult[0]
         console.log("Package row status:", packageData?.status)
 
+        // Block tracking fetches if the package is already arrived or delivered
+        const packageStatus = String(packageData.status || '').trim().toLowerCase()
+        if (packageStatus === 'arrived' || packageStatus === 'delivered') {
+            return NextResponse.json({
+                success: false,
+                error: 'Package is already delivered or arrived. Tracking is not available.'
+            }, { status: 400 })
+        }
+
         // Check payment status and delivery time
         const paymentResult = await sql`
       SELECT * FROM payments WHERE package_id = ${trackingNumber}
@@ -504,8 +513,9 @@ export async function GET(request: NextRequest, { params }: { params: { tracking
             receiver_phone: packageData.receiver_phone?.replace(/(\+\d{3})\d{5}(\d{2,})/, "$1*****$2"),
         }
 
-        // Send progress update SMS notifications (only once per milestone)
-        const progressMilestones = [50, 80, 100]
+        // Send progress update SMS notifications.
+        // Per request: only send milestone notifications when progress reaches 100%.
+        const progressMilestones = [100]
         for (const milestone of progressMilestones) {
             if (progress >= milestone) {
                 // Check if notification already sent
