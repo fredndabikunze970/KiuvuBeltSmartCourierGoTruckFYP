@@ -8,14 +8,44 @@ export const sql = neon(process.env.DATABASE_URL)
 
 // Database utility functions
 export const db = {
-  async query(query: string | { text: string; values: any[] }) {
+  async query(query: string | { text: string; values: any[] }, values?: any[]) {
     try {
-      if (typeof query === 'string') {
-        // If string query, use tagged template literal
-        return await sql`${query}`
+      // If caller passed an object with text/values
+      if (typeof query === 'object' && query !== null && 'text' in query) {
+        return await sql.query(query.text, query.values)
       }
-      // Use sql.query for parameterized queries
-      return await sql.query(query.text, query.values)
+
+      // If a plain string is provided, allow optional values array as second arg
+      let res: any
+      if (typeof query === 'string') {
+        if (Array.isArray(values) && values.length) {
+          res = await sql.query(query, values)
+        } else {
+          // No parameters: execute simple query
+          res = await sql.query(query)
+        }
+      } else {
+        throw new Error('Unsupported query signature')
+      }
+
+      // Normalize return: many callers expect either an array of rows or an object with `.rows`.
+      // If the driver returned an object with `.rows`, return the rows array but keep a `.rows` property on it.
+      const rows = Array.isArray(res) ? res : (res && res.rows ? res.rows : [])
+      try {
+        // Attach `.rows` property to the returned array for callers that expect an object with rows
+        if (Array.isArray(rows) && !(rows as any).rows) {
+          Object.defineProperty(rows, 'rows', {
+            value: rows,
+            enumerable: false,
+            writable: false,
+            configurable: true,
+          })
+        }
+      } catch (e) {
+        // Ignore defineProperty failures
+      }
+
+      return rows
     } catch (error) {
       console.error("Database query error:", error)
       throw error

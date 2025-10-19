@@ -17,6 +17,34 @@ export async function GET(request: NextRequest) {
     const limit = Number.parseInt(searchParams.get("limit") || "10")
     const status = searchParams.get("status")
     const search = searchParams.get("search")
+    const dateRange = searchParams.get("dateRange")
+
+    // compute date range bounds (UTC) when requested
+    let dateStart: Date | undefined
+    let dateEnd: Date | undefined
+    if (dateRange && dateRange !== 'all') {
+      const now = new Date()
+      const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds()))
+
+      const startOfDay = (dt: Date) => new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()))
+
+      if (dateRange === 'today') {
+        dateStart = startOfDay(utcNow)
+        dateEnd = new Date(dateStart); dateEnd.setUTCDate(dateStart.getUTCDate() + 1)
+      } else if (dateRange === 'yesterday') {
+        dateEnd = startOfDay(utcNow)
+        dateStart = new Date(dateEnd); dateStart.setUTCDate(dateEnd.getUTCDate() - 1)
+      } else if (dateRange === 'this_week') {
+        // ISO week with Monday as start
+        const day = utcNow.getUTCDay() || 7 // Sunday -> 7
+        const monday = new Date(startOfDay(utcNow)); monday.setUTCDate(startOfDay(utcNow).getUTCDate() - (day - 1))
+        dateStart = monday
+        dateEnd = new Date(startOfDay(utcNow)); dateEnd.setUTCDate(dateStart.getUTCDate() + 7)
+      } else if (dateRange === 'this_month') {
+        dateStart = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1))
+        dateEnd = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1))
+      }
+    }
 
     let packages
 
@@ -40,6 +68,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.status = ${status}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -60,6 +89,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.status = ${status}
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -80,6 +110,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -123,6 +154,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.origin_branch_id = ${user.branch_id} AND p.status = ${status}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -143,6 +175,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.origin_branch_id = ${user.branch_id} AND p.status = ${status}
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -164,6 +197,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.origin_branch_id = ${user.branch_id}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -184,6 +218,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.origin_branch_id = ${user.branch_id}
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -208,6 +243,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.agent_id = ${user.user_id} AND p.status = ${status}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -228,6 +264,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.agent_id = ${user.user_id} AND p.status = ${status}
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -249,6 +286,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.agent_id = ${user.user_id}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
@@ -269,20 +307,45 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
           WHERE p.agent_id = ${user.user_id}
+          ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `
       }
     }
 
-    // Get total count
+    // Get total count reflecting the same filters
     let totalQuery
     if (user.role === "admin") {
-      totalQuery = sql`SELECT COUNT(*) FROM packages`
+      if (status && search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE status = ${status} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (status) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE status = ${status} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else {
+        totalQuery = sql`SELECT COUNT(*) FROM packages ${dateStart ? sql`WHERE created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      }
     } else if (user.role === "agent") {
-      totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id}`
+      if (status && search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND status = ${status} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (status) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND status = ${status} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      }
     } else {
-      totalQuery = sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id}`
+      if (status && search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id} AND status = ${status} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (status) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id} AND status = ${status} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else if (search) {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      } else {
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE agent_id = ${user.user_id} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+      }
     }
 
     const totalResult = await totalQuery

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,18 +12,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/hooks/use-auth"
 import { apiService, type Package } from "@/lib/api"
 import {
-  Calendar,
-  Car,
-  ChevronDown,
-  ChevronRight,
-  Edit,
-  Eye,
-  MapPin,
-  Package as PackageIcon,
-  Phone,
-  Search,
-  Truck,
-  User
+    Calendar,
+    Car,
+    ChevronDown,
+    ChevronRight,
+    Edit,
+    Eye,
+    MapPin,
+    Package as PackageIcon,
+    Phone,
+    Search,
+    Truck,
+    User
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -48,6 +49,11 @@ const statusConfig = {
     label: "Out for Delivery",
     color: "bg-orange-100 text-orange-800 border-orange-200",
     icon: "🏍️"
+  },
+  arrived: {
+    label: "Arrived",
+    color: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    icon: "🏁"
   },
   delivered: {
     label: "Delivered",
@@ -87,7 +93,12 @@ export function PackageList() {
   const [dateRange, setDateRange] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const { user } = useAuth()
+  const [detailPkg, setDetailPkg] = useState<Package | null>(null)
+  const [detailTracking, setDetailTracking] = useState<any[] | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const fetchPackages = async () => {
     try {
@@ -104,9 +115,10 @@ export function PackageList() {
         params.dateRange = dateRange
       }
 
-      const response = await apiService.getPackages(params)
-      setPackages(response.packages)
-      setTotalPages(response.pagination.pages)
+  const response = await apiService.getPackages(params)
+  setPackages(response.packages)
+  setTotalPages(response.pagination.pages)
+  setTotalCount(response.pagination.total)
     } catch (error) {
       console.error("Failed to fetch packages:", error)
     } finally {
@@ -231,6 +243,7 @@ export function PackageList() {
                 <SelectItem value="picked_up">🚚 Picked Up</SelectItem>
                 <SelectItem value="in_transit">🚛 In Transit</SelectItem>
                 <SelectItem value="out_for_delivery">🏍️ Out for Delivery</SelectItem>
+                <SelectItem value="arrived">🏁 Arrived</SelectItem>
                 <SelectItem value="delivered">✅ Delivered</SelectItem>
                 <SelectItem value="cancelled">❌ Cancelled</SelectItem>
               </SelectContent>
@@ -260,7 +273,7 @@ export function PackageList() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-600">Total Packages</p>
-                <p className="text-2xl font-bold text-blue-800">{filteredPackages.length}</p>
+                <p className="text-2xl font-bold text-blue-800">{totalCount}</p>
               </div>
               <div className="p-2 bg-blue-200 rounded-lg">
                 <PackageIcon className="h-5 w-5 text-blue-700" />
@@ -275,7 +288,7 @@ export function PackageList() {
               <div>
                 <p className="text-sm font-medium text-green-600">Delivered</p>
                 <p className="text-2xl font-bold text-green-800">
-                  {filteredPackages.filter(pkg => pkg.status === 'delivered').length}
+                  {packages.filter(pkg => pkg.status === 'delivered').length}
                 </p>
               </div>
               <div className="p-2 bg-green-200 rounded-lg">
@@ -291,7 +304,7 @@ export function PackageList() {
               <div>
                 <p className="text-sm font-medium text-purple-600">In Transit</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {filteredPackages.filter(pkg => pkg.status === 'in_transit').length}
+                  {packages.filter(pkg => pkg.status === 'in_transit').length}
                 </p>
               </div>
               <div className="p-2 bg-purple-200 rounded-lg">
@@ -307,7 +320,7 @@ export function PackageList() {
               <div>
                 <p className="text-sm font-medium text-orange-600">Pending</p>
                 <p className="text-2xl font-bold text-orange-800">
-                  {filteredPackages.filter(pkg =>
+                  {packages.filter(pkg =>
                     ['registered', 'picked_up', 'out_for_delivery'].includes(pkg.status)
                   ).length}
                 </p>
@@ -460,35 +473,93 @@ export function PackageList() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
-                                  <Link href={`/dashboard/packages/${pkg.package_id}`}>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-700"
-                                      title="View Details"
-                                    >
-                                      <Eye className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </Link>
+                                <div className="flex gap-2 items-center">
+                                  <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label={`View details for ${pkg.package_id}`}
+                                        title={`View details for ${pkg.package_id}`}
+                                        className="h-8 px-2 py-1 flex items-center gap-2 hover:bg-blue-50 hover:text-blue-700"
+                                        onClick={async (e) => {
+                                          e.preventDefault()
+                                          setDetailLoading(true)
+                                          setDetailOpen(true)
+                                          try {
+                                            const res = await apiService.getPackage(pkg.package_id)
+                                            setDetailPkg(res.package)
+                                            setDetailTracking(res.tracking || [])
+                                          } catch (err) {
+                                            console.error('Failed to load package details', err)
+                                            setDetailPkg(null)
+                                            setDetailTracking([])
+                                          } finally {
+                                            setDetailLoading(false)
+                                          }
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        <span className="hidden sm:inline text-sm">Details</span>
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Package Details</DialogTitle>
+                                      </DialogHeader>
+                                      <div className="space-y-4">
+                                        {detailLoading && <div>Loading...</div>}
+                                        {!detailLoading && detailPkg && (
+                                          <div>
+                                            <p className="font-semibold">{detailPkg.package_id} — {detailPkg.status}</p>
+                                            <p className="text-sm text-muted-foreground">Sender: {detailPkg.sender_name} ({detailPkg.sender_phone})</p>
+                                            <p className="text-sm text-muted-foreground">Receiver: {detailPkg.receiver_name} ({detailPkg.receiver_phone})</p>
+                                            <div className="mt-3">
+                                              <h4 className="font-medium">Recent Tracking</h4>
+                                              <ul className="text-sm list-disc list-inside mt-2">
+                                                {detailTracking && detailTracking.length === 0 && <li>No tracking entries</li>}
+                                                {detailTracking && detailTracking.map((t) => (
+                                                  <li key={t.id}>{new Date(t.created_at).toLocaleString()} — {t.status} — {t.location_name ?? t.notes ?? ''}</li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {!detailLoading && !detailPkg && (
+                                          <div className="text-sm text-red-600">Failed to load details.</div>
+                                        )}
+                                      </div>
+                                      <div className="mt-4 text-right">
+                                        <DialogClose asChild>
+                                          <Button variant="outline">Close</Button>
+                                        </DialogClose>
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+
                                   <Link href={`/dashboard/packages/${pkg.package_id}/update`}>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-700"
-                                      title="Edit Package"
+                                      aria-label={`Edit package ${pkg.package_id}`}
+                                      title={`Edit package ${pkg.package_id}`}
+                                      className="h-8 px-2 py-1 flex items-center gap-2 hover:bg-green-50 hover:text-green-700"
                                     >
-                                      <Edit className="h-3.5 w-3.5" />
+                                      <Edit className="h-4 w-4" />
+                                      <span className="hidden sm:inline text-sm">Edit</span>
                                     </Button>
                                   </Link>
+
                                   <Link href={`/track/${pkg.package_id}`}>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-purple-100 hover:text-purple-700"
-                                      title="Track Package"
+                                      aria-label={`Track package ${pkg.package_id}`}
+                                      title={`Track package ${pkg.package_id}`}
+                                      className="h-8 px-2 py-1 flex items-center gap-2 bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 text-purple-700"
                                     >
-                                      <Truck className="h-3.5 w-3.5" />
+                                      <Truck className="h-4 w-4" />
+                                      <span className="hidden sm:inline text-sm">Track</span>
                                     </Button>
                                   </Link>
                                 </div>
@@ -726,15 +797,26 @@ export function PackageList() {
                     {/* Actions */}
                     <div className="flex gap-2">
                       <Link href={`/dashboard/packages/${pkg.package_id}`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full">
-                          <Eye className="h-3.5 w-3.5 mr-1" />
-                          Details
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full flex items-center justify-center gap-2"
+                          aria-label={`View details for ${pkg.package_id}`}
+                          title={`View details for ${pkg.package_id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="hidden sm:inline">Details</span>
                         </Button>
                       </Link>
                       <Link href={`/track/${pkg.package_id}`} className="flex-1">
-                        <Button size="sm" className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
-                          <Truck className="h-3.5 w-3.5 mr-1" />
-                          Track
+                        <Button
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center gap-2"
+                          aria-label={`Track package ${pkg.package_id}`}
+                          title={`Track package ${pkg.package_id}`}
+                        >
+                          <Truck className="h-4 w-4" />
+                          <span className="hidden sm:inline">Track</span>
                         </Button>
                       </Link>
                     </div>

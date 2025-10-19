@@ -47,6 +47,7 @@ export default function CarManagementPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCar, setSelectedCar] = useState<Car | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const { toast } = useToast()
 
   const form = useForm<CarFormData>({
@@ -111,6 +112,7 @@ export default function CarManagementPage() {
       fetchCars()
       form.reset()
       setSelectedCar(null)
+      setDialogOpen(false)
     } catch (error) {
       toast({
         title: "Error",
@@ -148,6 +150,7 @@ export default function CarManagementPage() {
       status: car.status,
       branch_id: car.branch_id,
     })
+    setDialogOpen(true)
   }
 
   // Use shared getStatusColor from lib/utils for consistent color tokens
@@ -168,9 +171,20 @@ export default function CarManagementPage() {
           <h1 className="text-2xl font-bold">Car Fleet Management</h1>
           <p className="text-muted-foreground">Manage your delivery vehicles and assignments</p>
         </div>
-        <Dialog>
+        <Dialog open={dialogOpen} onOpenChange={(v) => setDialogOpen(v)}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => {
+              // prepare add
+              setSelectedCar(null)
+              form.reset({
+                plate_number: "",
+                model: "",
+                capacity_kg: 0,
+                status: "available",
+                branch_id: "",
+              })
+              setDialogOpen(true)
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Vehicle
             </Button>
@@ -280,6 +294,7 @@ export default function CarManagementPage() {
                 <Button variant="outline" type="button" onClick={() => {
                   form.reset()
                   setSelectedCar(null)
+                  setDialogOpen(false)
                 }}>
                   Cancel
                 </Button>

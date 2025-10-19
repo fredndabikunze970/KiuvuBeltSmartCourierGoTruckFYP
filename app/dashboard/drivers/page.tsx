@@ -58,6 +58,8 @@ export default function DriverManagementPage() {
   const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogLoading, setDialogLoading] = useState(false)
   const { toast } = useToast()
 
   const form = useForm<DriverFormData>({
@@ -66,7 +68,8 @@ export default function DriverManagementPage() {
       full_name: "",
       phone: "",
       license_number: "",
-      assigned_car: null,
+      // use a non-empty sentinel for the Select control
+      assigned_car: "none",
       branch_id: "",
     },
   })
@@ -74,6 +77,28 @@ export default function DriverManagementPage() {
   useEffect(() => {
     Promise.all([fetchDrivers(), fetchBranches(), fetchCars()])
   }, [])
+
+  useEffect(() => {
+    if (selectedDriver) {
+      // Pre-populate form with selected driver data
+      form.reset({
+        full_name: selectedDriver.full_name || '',
+        phone: selectedDriver.phone || '',
+        license_number: selectedDriver.license_number || '',
+        assigned_car: selectedDriver.assigned_car || "none",
+        branch_id: selectedDriver.branch_id || '',
+      })
+    } else {
+      // Reset form for new driver creation
+      form.reset({
+        full_name: '',
+        phone: '',
+        license_number: '',
+        assigned_car: "none",
+        branch_id: '',
+      })
+    }
+  }, [selectedDriver, form])
 
   const fetchDrivers = async () => {
     try {
@@ -118,23 +143,52 @@ export default function DriverManagementPage() {
 
   const onSubmit = async (data: DriverFormData) => {
     try {
+      console.log("Form data being submitted:", data)
+
       if (selectedDriver) {
-        await apiService.updateDriver(selectedDriver.driver_id, data)
+        // For updates, send all the form data directly
+        const payload = {
+          full_name: data.full_name?.trim() || selectedDriver.full_name,
+          phone: data.phone?.trim() || selectedDriver.phone,
+          license_number: data.license_number?.trim() || selectedDriver.license_number,
+          assigned_car: data.assigned_car === "none" ? null : (data.assigned_car || selectedDriver.assigned_car),
+          branch_id: data.branch_id?.trim() || selectedDriver.branch_id,
+        }
+
+        console.log("Update payload:", payload)
+        await apiService.updateDriver(selectedDriver.driver_id, payload)
         toast({
           title: "Success",
           description: "Driver updated successfully",
         })
       } else {
-        await apiService.createDriver(data)
+        // For creation, send all required fields
+        const payload = {
+          full_name: data.full_name || '',
+          phone: data.phone || '',
+          license_number: data.license_number || '',
+          assigned_car: data.assigned_car === "none" ? null : (data.assigned_car || null),
+          branch_id: data.branch_id || '',
+        }
+
+        await apiService.createDriver(payload)
         toast({
           title: "Success",
           description: "Driver created successfully",
         })
       }
-      
+
       fetchDrivers()
-      form.reset()
+      // Reset form and close dialog
+      form.reset({
+        full_name: '',
+        phone: '',
+        license_number: '',
+        assigned_car: "none",
+        branch_id: '',
+      })
       setSelectedDriver(null)
+      setDialogOpen(false)
     } catch (error) {
       toast({
         title: "Error",
@@ -163,15 +217,61 @@ export default function DriverManagementPage() {
     }
   }
 
-  const handleEdit = (driver: Driver) => {
-    setSelectedDriver(driver)
-    form.reset({
-      full_name: driver.full_name,
-      phone: driver.phone,
-      license_number: driver.license_number,
-      assigned_car: driver.assigned_car,
-      branch_id: driver.branch_id,
-    })
+  const handleEdit = async (driver: Driver) => {
+    try {
+      setDialogLoading(true)
+      // Fetch the freshest driver record from the server
+      const res = await apiService.getDriver(driver.driver_id)
+      const fresh = res.driver
+      setSelectedDriver(fresh as Driver)
+
+      // populate the form with the DB values
+      form.reset({
+        full_name: fresh.full_name || "",
+        phone: fresh.phone || "",
+        license_number: fresh.license_number || "",
+        // keep the Select sentinel when there's no assigned car
+        assigned_car: fresh.assigned_car ?? "none",
+        branch_id: fresh.branch_id || "",
+      })
+
+      // Set selectedDriver to trigger the useEffect that populates the form
+      setSelectedDriver(fresh as Driver)
+
+      // If the driver has an assigned car that isn't in our `cars` list (for example it's not 'available'),
+      // fetch that car and add it so the Select can display the current assignment.
+      if (fresh.assigned_car) {
+        const alreadyHas = cars.some((c) => c.car_id === fresh.assigned_car)
+        if (!alreadyHas) {
+          try {
+            const { car } = await apiService.getCar(fresh.assigned_car)
+            // normalize shape to our Car type and prepend so it's visible
+            setCars((prev) => [
+              {
+                car_id: car.car_id,
+                plate_number: car.plate_number,
+                model: car.model,
+                status: car.status,
+              },
+              ...prev,
+            ])
+          } catch (err) {
+            // ignore fetch error; Select will show sentinel if we can't fetch the car
+            console.warn('Failed to fetch assigned car', err)
+          }
+        }
+      }
+
+      setDialogOpen(true)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load driver details",
+        variant: "destructive",
+      })
+    } finally {
+      setDialogLoading(false)
+    }
   }
 
   const getInitials = (name: string) => {
@@ -192,9 +292,20 @@ export default function DriverManagementPage() {
             Manage your delivery drivers and their assignments
           </p>
         </div>
-        <Dialog>
+        <Dialog open={dialogOpen} onOpenChange={(v) => setDialogOpen(v)}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => {
+              // Prepare for creating a new driver
+              setSelectedDriver(null)
+              form.reset({
+                full_name: "",
+                phone: "",
+                license_number: "",
+                assigned_car: "none",
+                branch_id: "",
+              })
+              setDialogOpen(true)
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Driver
             </Button>
@@ -214,7 +325,7 @@ export default function DriverManagementPage() {
                 <Input
                   id="full_name"
                   {...form.register("full_name")}
-                  placeholder="John Doe"
+                  placeholder="Full Name"
                 />
                 {form.formState.errors.full_name && (
                   <p className="text-sm text-red-500">
@@ -228,7 +339,7 @@ export default function DriverManagementPage() {
                 <Input
                   id="phone"
                   {...form.register("phone")}
-                  placeholder="+250788123456"
+                  placeholder="+2507xxxxx"
                 />
                 {form.formState.errors.phone && (
                   <p className="text-sm text-red-500">
@@ -242,7 +353,7 @@ export default function DriverManagementPage() {
                 <Input
                   id="license_number"
                   {...form.register("license_number")}
-                  placeholder="DL12345"
+                  placeholder="License Number"
                 />
                 {form.formState.errors.license_number && (
                   <p className="text-sm text-red-500">
@@ -254,9 +365,9 @@ export default function DriverManagementPage() {
               <div className="space-y-2">
                 <Label htmlFor="assigned_car">Assigned Vehicle</Label>
                 <Select
-                  // Use a non-empty sentinel value for "no vehicle" and map it to null in the form
-                  value={form.getValues("assigned_car") ?? "none"}
-                  onValueChange={(value) => form.setValue("assigned_car", value === "none" ? null : value)}
+                  // Use a non-empty sentinel value for "no vehicle". Watch keeps the control in sync.
+                  value={form.watch("assigned_car") ?? "none"}
+                  onValueChange={(value) => form.setValue("assigned_car", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select vehicle" />
@@ -280,7 +391,7 @@ export default function DriverManagementPage() {
               <div className="space-y-2">
                 <Label htmlFor="branch">Assigned Branch</Label>
                 <Select
-                  value={form.getValues("branch_id")}
+                  value={form.watch("branch_id") || ""}
                   onValueChange={(value) => form.setValue("branch_id", value)}
                 >
                   <SelectTrigger>
@@ -305,6 +416,7 @@ export default function DriverManagementPage() {
                 <Button variant="outline" type="button" onClick={() => {
                   form.reset()
                   setSelectedDriver(null)
+                  setDialogOpen(false)
                 }}>
                   Cancel
                 </Button>
@@ -346,7 +458,7 @@ export default function DriverManagementPage() {
                   </Avatar>
                   <div>
                     <div className="font-semibold">{driver.full_name}</div>
-                    <div className="text-xs text-muted-foreground md:hidden">{driver.license_number}</div>
+                    <div className="text-xs text-muted-foreground">{driver.license_number}</div>
                   </div>
                 </div>
 

@@ -55,7 +55,7 @@ export function LoginForm() {
               <Input
                 id="email"
                 type="email"
-                placeholder="agent@kivubelt.com"
+                placeholder="Enter Your Username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 w-full"

@@ -32,9 +32,9 @@ export const carSchema = z.object({
 })
 
 export const driverSchema = z.object({
-  full_name: z.string().min(3, "Full name must be at least 3 characters"),
-  phone: z.string().regex(/^\+?[0-9]{10,}$/, "Invalid phone number format"),
-  license_number: z.string().min(5, "License number must be at least 5 characters"),
-  assigned_car: z.string().nullable(),
-  branch_id: z.string().min(1, "Branch must be selected"),
+  full_name: z.string().min(3, "Full name must be at least 3 characters").optional(),
+  phone: z.string().regex(/^\+?[0-9]{10,}$/, "Invalid phone number format").optional(),
+  license_number: z.string().min(5, "License number must be at least 5 characters").optional(),
+  assigned_car: z.string().nullable().optional(),
+  branch_id: z.string().min(1, "Branch must be selected").optional(),
 })

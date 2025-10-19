@@ -176,8 +176,33 @@ class ApiService {
     return this.request(`/packages${query ? `?${query}` : ""}`)
   }
 
-  async getPackage(packageId: string): Promise<{ package: Package }> {
+  async getPackage(packageId: string): Promise<{ package: Package; tracking?: TrackingEntry[] }> {
     return this.request(`/packages/${packageId}`)
+  }
+
+  async updatePackage(packageId: string, data: Partial<{
+    sender_name: string
+    sender_phone: string
+    sender_address: string
+    receiver_name: string
+    receiver_phone: string
+    receiver_address: string
+    package_description: string
+    weight: number
+    dimensions: string
+    declared_value: number
+    delivery_fee: number
+    priority: "normal" | "express" | "urgent"
+    origin_branch_id: string
+    destination_branch_id: string
+    assigned_car: string
+    assigned_driver: string
+    delivery_time: string
+  }>): Promise<{ package: Package }> {
+    return this.request(`/packages/${packageId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
   }
 
   async updatePackageStatus(
