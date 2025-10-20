@@ -22,7 +22,7 @@ import { carSchema } from "@/lib/validations/management"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Car as CarIcon, Edit, Loader2, Plus, Trash } from "lucide-react"
 import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import type * as z from "zod"
 
 type Car = {
@@ -30,7 +30,7 @@ type Car = {
   plate_number: string
   model: string
   capacity_kg: number
-  status: "available" | "in-use" | "maintenance"
+  status: "available" | "in_transit" | "maintenance" | "retired"
   branch_id: string
   branch_name: string
 }
@@ -59,11 +59,26 @@ export default function CarManagementPage() {
       status: "available",
       branch_id: "",
     },
+    mode: "onChange",
   })
 
   useEffect(() => {
     Promise.all([fetchCars(), fetchBranches()])
   }, [])
+
+  useEffect(() => {
+    if (selectedCar) {
+      console.log('useEffect - selectedCar changed:', selectedCar)
+      form.reset({
+        plate_number: selectedCar.plate_number || '',
+        model: selectedCar.model || '',
+        capacity_kg: Number(selectedCar.capacity_kg) || 0,
+        status: selectedCar.status || 'available',
+        branch_id: selectedCar.branch_id || '',
+      })
+      console.log('useEffect - form values after reset:', form.getValues())
+    }
+  }, [selectedCar, form])
 
   const fetchCars = async () => {
     try {
@@ -84,12 +99,14 @@ export default function CarManagementPage() {
     try {
       const data = await apiService.getBranches()
       setBranches(data.branches)
+      return data.branches
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to fetch branches",
         variant: "destructive",
       })
+      return []
     }
   }
 
@@ -141,16 +158,65 @@ export default function CarManagementPage() {
     }
   }
 
-  const handleEdit = (car: Car) => {
-    setSelectedCar(car)
-    form.reset({
-      plate_number: car.plate_number,
-      model: car.model,
-      capacity_kg: car.capacity_kg,
-      status: car.status,
-      branch_id: car.branch_id,
-    })
-    setDialogOpen(true)
+  const handleEdit = async (car: Car) => {
+    try {
+      // Fetch branches if not loaded
+      if (branches.length === 0) {
+        await fetchBranches()
+      }
+      
+      // Fetch fresh car data from server
+      const res = await apiService.getCar(car.car_id)
+      console.log('Fresh car data:', res)
+      const freshCar = res.car || res
+      
+      // Normalize the car data
+      const normalized: Car = {
+        car_id: freshCar.car_id || car.car_id,
+        plate_number: freshCar.plate_number || car.plate_number || '',
+        model: freshCar.model || car.model || '',
+        capacity_kg: Number(freshCar.capacity_kg || car.capacity_kg || 0),
+        status: freshCar.status || car.status || 'available',
+        branch_id: freshCar.branch_id || car.branch_id || '',
+        branch_name: freshCar.branch_name || car.branch_name || '',
+      }
+      
+      console.log('Normalized car:', normalized)
+      console.log('Form before reset:', form.getValues())
+      
+      // Reset form with fresh data
+      form.reset({
+        plate_number: normalized.plate_number,
+        model: normalized.model,
+        capacity_kg: normalized.capacity_kg,
+        status: normalized.status,
+        branch_id: normalized.branch_id,
+      })
+      
+      console.log('Form after reset:', form.getValues())
+      
+      // Set selected car AFTER form reset
+      setSelectedCar(normalized)
+      
+      // Force set values explicitly after a small delay
+      setTimeout(() => {
+        form.setValue('plate_number', normalized.plate_number, { shouldValidate: false })
+        form.setValue('model', normalized.model, { shouldValidate: false })
+        form.setValue('capacity_kg', normalized.capacity_kg, { shouldValidate: false })
+        form.setValue('status', normalized.status, { shouldValidate: false })
+        form.setValue('branch_id', normalized.branch_id, { shouldValidate: false })
+        console.log('Form values force set:', form.getValues())
+      }, 50)
+      
+      setDialogOpen(true)
+    } catch (error) {
+      console.error('Error fetching car:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load car details",
+        variant: "destructive",
+      })
+    }
   }
 
   // Use shared getStatusColor from lib/utils for consistent color tokens
@@ -203,10 +269,16 @@ export default function CarManagementPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="plate_number">Plate Number</Label>
-                <Input
-                  id="plate_number"
-                  {...form.register("plate_number")}
-                  placeholder="e.g., RAB123A"
+                <Controller
+                  control={form.control}
+                  name="plate_number"
+                  render={({ field }) => (
+                    <Input
+                      id="plate_number"
+                      {...field}
+                      placeholder="e.g., RAB123A"
+                    />
+                  )}
                 />
                 {form.formState.errors.plate_number && (
                   <p className="text-sm text-red-500">
@@ -217,10 +289,16 @@ export default function CarManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="model">Model</Label>
-                <Input
-                  id="model"
-                  {...form.register("model")}
-                  placeholder="e.g., Toyota Hilux"
+                <Controller
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <Input
+                      id="model"
+                      {...field}
+                      placeholder="e.g., Toyota Hilux"
+                    />
+                  )}
                 />
                 {form.formState.errors.model && (
                   <p className="text-sm text-red-500">
@@ -231,11 +309,18 @@ export default function CarManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="capacity_kg">Capacity (kg)</Label>
-                <Input
-                  id="capacity_kg"
-                  type="number"
-                  step="0.1"
-                  {...form.register("capacity_kg", { valueAsNumber: true })}
+                <Controller
+                  control={form.control}
+                  name="capacity_kg"
+                  render={({ field }) => (
+                    <Input
+                      id="capacity_kg"
+                      type="number"
+                      step="0.1"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  )}
                 />
                 {form.formState.errors.capacity_kg && (
                   <p className="text-sm text-red-500">
@@ -246,21 +331,23 @@ export default function CarManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select
-                  value={form.getValues("status")}
-                  onValueChange={(value: "available" | "in-use" | "maintenance") =>
-                    form.setValue("status", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">Available</SelectItem>
-                    <SelectItem value="in-use">In Use</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="in_transit">In Transit</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="retired">Retired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {form.formState.errors.status && (
                   <p className="text-sm text-red-500">
                     {form.formState.errors.status.message}
@@ -270,21 +357,24 @@ export default function CarManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="branch">Assigned Branch</Label>
-                <Select
-                  value={form.getValues("branch_id")}
-                  onValueChange={(value) => form.setValue("branch_id", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.branch_id} value={branch.branch_id}>
-                        {branch.branch_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="branch_id"
+                  render={({ field }) => (
+                    <Select value={field.value || ""} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                            {branch.branch_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {form.formState.errors.branch_id && (
                   <p className="text-sm text-red-500">
                     {form.formState.errors.branch_id.message}

@@ -1,14 +1,14 @@
 import type {
-    BranchResponse,
-    CarResponse,
-    DriverResponse,
-    PackageRegistrationData,
-    PackageRegistrationResponse
+  BranchResponse,
+  CarResponse,
+  DriverResponse,
+  PackageRegistrationData,
+  PackageRegistrationResponse
 } from "./api-types"
 import { authService } from "./auth"
 import type {
-    Branch,
-    Package
+  Branch,
+  Package
 } from "./types"
 
 interface TrackingEntry {
@@ -71,17 +71,84 @@ class ApiService {
   // Package API methods
     // Fleet management API methods
   async getBranches(): Promise<BranchResponse> {
-      return this.request("/branches")
+    return this.request("/branches")
   }
 
   async getCars(params?: { branchId?: string }): Promise<CarResponse> {
     const query = params?.branchId ? `?branch_id=${params.branchId}` : ""
-      return this.request(`/cars${query}`)
+    return this.request(`/cars${query}`)
   }
 
   async getDrivers(params?: { branchId?: string }): Promise<DriverResponse> {
     const query = params?.branchId ? `?branch_id=${params.branchId}` : ""
-      return this.request(`/drivers${query}`)
+    // API routes live under /drivers (not /admin/drivers)
+    return this.request(`/drivers${query}`)
+  }
+
+  async getDriver(driverId: string): Promise<{ driver: any }> {
+    return this.request(`/drivers/${driverId}`)
+  }
+
+  async createDriver(data: {
+    full_name: string
+    phone: string
+    license_number: string
+    assigned_car?: string | null
+    branch_id?: string
+  }): Promise<{ driver: any }> {
+    return this.request(`/drivers`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateDriver(driverId: string, data: any): Promise<{ driver: any }> {
+    return this.request(`/drivers/${driverId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteDriver(driverId: string): Promise<{ message: string }> {
+    return this.request(`/drivers/${driverId}`, {
+      method: "DELETE",
+    })
+  }
+
+  async getCar(carId: string): Promise<{ car: any }> {
+    return this.request(`/cars/${carId}`)
+  }
+
+  async createCar(data: {
+    plate_number: string
+    model: string
+    capacity_kg: number
+    status: string
+    branch_id: string
+  }): Promise<{ car: any }> {
+    return this.request("/cars", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateCar(carId: string, data: {
+    plate_number: string
+    model: string
+    capacity_kg: number
+    status: string
+    branch_id: string
+  }): Promise<{ car: any }> {
+    return this.request(`/cars/${carId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteCar(carId: string): Promise<{ message: string }> {
+    return this.request(`/cars/${carId}`, {
+      method: "DELETE",
+    })
   }
 
   async registerPackage(packageData: PackageRegistrationData): Promise<PackageRegistrationResponse> {

@@ -30,13 +30,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { plate_number, model, capacity_kg, branch_id } = await request.json()
+    const { plate_number, model, capacity_kg, status, branch_id } = await request.json()
 
     const car_id = generateCarId()
 
     const result = await sql`
       INSERT INTO cars (car_id, plate_number, model, capacity_kg, status, branch_id)
-      VALUES (${car_id}, ${plate_number}, ${model}, ${capacity_kg}, 'available', ${branch_id})
+      VALUES (${car_id}, ${plate_number}, ${model}, ${capacity_kg}, ${status || 'available'}, ${branch_id})
       RETURNING *
     `
 
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
+    console.error('Error creating car:', error)
     return NextResponse.json(
       { error: "Failed to create car" },
       { status: 500 }

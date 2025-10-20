@@ -23,7 +23,7 @@ import { driverSchema } from "@/lib/validations/management"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Edit, Loader2, Plus, Trash, Users } from "lucide-react"
 import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import type * as z from "zod"
 
 type Driver = {
@@ -98,12 +98,75 @@ export default function DriverManagementPage() {
         branch_id: '',
       })
     }
+    // Log selected driver and current form values to browser console
+    console.log('useEffect selectedDriver -> form values', selectedDriver, form.getValues())
   }, [selectedDriver, form])
+
+  // Log selectedDriver, cars and branches when they change for debugging
+  useEffect(() => {
+    console.log('Debug selectedDriver changed:', selectedDriver)
+  }, [selectedDriver])
+
+  useEffect(() => {
+    console.log('Debug cars list:', cars)
+  }, [cars])
+
+  useEffect(() => {
+    console.log('Debug branches list:', branches)
+  }, [branches])
+
+  // Subscribe to form changes and log values to console for debugging
+  useEffect(() => {
+    const subscription = form.watch((values) => {
+      // Log live form values to console for debugging
+      console.log('form.watch values:', values)
+    })
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [form])
+
+  // Log form state when the edit dialog opens to help diagnose render/timing issues
+  useEffect(() => {
+    if (dialogOpen) {
+      console.log('Dialog opened. selectedDriver:', selectedDriver)
+      console.log('Dialog opened. form.getValues():', form.getValues())
+      console.log('Dialog opened. cars:', cars)
+      console.log('Dialog opened. branches:', branches)
+    }
+  }, [dialogOpen, selectedDriver, cars, branches, form])
+
+  // Ensure form assigned_car value is set when selectedDriver or cars change
+  useEffect(() => {
+    if (selectedDriver && dialogOpen) {
+      const currentValue = form.getValues('assigned_car')
+      const expectedValue = selectedDriver.assigned_car ?? 'none'
+      if (currentValue !== expectedValue) {
+        form.setValue('assigned_car', expectedValue)
+        console.log('Updated form assigned_car to:', expectedValue)
+      }
+    }
+  }, [selectedDriver, cars, dialogOpen, form])
 
   const fetchDrivers = async () => {
     try {
       const data = await apiService.getDrivers()
-      setDrivers(data.drivers)
+      // Normalize driver shape from API (some routes return different field names)
+  const normalized = (data.drivers || []).map((d: any) => ({
+        driver_id: d.driver_id,
+        full_name: d.full_name,
+        phone: d.phone,
+        license_number: d.license_number,
+        // prefer the explicit assigned_car column, fall back to assigned_car_id
+        assigned_car: d.assigned_car ?? d.assigned_car_id ?? null,
+        // prefer convenient fields from joins
+        branch_id: d.branch_id ?? d.branchId ?? null,
+        branch_name: d.branch_name ?? d.branch_name ?? (d.branch ? d.branch.branch_name : undefined) ?? '',
+        plate_number: d.plate_number ?? d.assigned_car_plate ?? d.plate_number ?? null,
+        model: d.model ?? d.assigned_car_model ?? null,
+      }))
+
+      setDrivers(normalized)
     } catch (error) {
       toast({
         title: "Error",
@@ -118,32 +181,52 @@ export default function DriverManagementPage() {
   const fetchBranches = async () => {
     try {
       const data = await apiService.getBranches()
-      setBranches(data.branches)
+      const normalized = ((data.branches || []) as any[]).map((b: any) => ({
+        branch_id: b.branch_id ?? b.branchId ?? b.id,
+        branch_name: b.branch_name ?? b.name ?? b.branchName,
+      }))
+      setBranches(normalized)
+      return normalized
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to fetch branches",
         variant: "destructive",
       })
+      return []
     }
   }
 
   const fetchCars = async () => {
     try {
       const data = await apiService.getCars()
-      setCars(data.cars.filter(car => car.status === "available"))
+      const normalized = ((data.cars || []) as any[]).map((c: any) => ({
+        car_id: c.car_id ?? c.carId ?? c.id,
+  plate_number: (c.plate_number ?? c.plateNumber ?? c.plate) || '',
+        model: c.model ?? c.model_name ?? '',
+        status: (c.status ?? c.state ?? 'available') as string,
+      }))
+
+      // Sort so available cars appear first, then others — this makes picking easier
+      normalized.sort((a: any, b: any) => {
+        const rank = (s: string) => s === 'available' ? 0 : 1
+        return rank(a.status) - rank(b.status)
+      })
+      setCars(normalized)
+      return normalized
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to fetch cars",
         variant: "destructive",
       })
+      return []
     }
   }
 
   const onSubmit = async (data: DriverFormData) => {
     try {
-      console.log("Form data being submitted:", data)
+  console.log("Form data being submitted:", data)
 
       if (selectedDriver) {
         // For updates, send all the form data directly
@@ -155,8 +238,9 @@ export default function DriverManagementPage() {
           branch_id: data.branch_id?.trim() || selectedDriver.branch_id,
         }
 
-        console.log("Update payload:", payload)
-        await apiService.updateDriver(selectedDriver.driver_id, payload)
+  console.log("Update payload:", payload)
+  const updateRes = await apiService.updateDriver(selectedDriver.driver_id, payload)
+  console.log("Update response:", updateRes)
         toast({
           title: "Success",
           description: "Driver updated successfully",
@@ -171,7 +255,8 @@ export default function DriverManagementPage() {
           branch_id: data.branch_id || '',
         }
 
-        await apiService.createDriver(payload)
+  const createRes = await apiService.createDriver(payload)
+  console.log("Create response:", createRes)
         toast({
           title: "Success",
           description: "Driver created successfully",
@@ -220,48 +305,101 @@ export default function DriverManagementPage() {
   const handleEdit = async (driver: Driver) => {
     try {
       setDialogLoading(true)
+      console.log('handleEdit invoked for driver:', driver)
+      
+      // Ensure branches and cars are loaded before proceeding
+      let currentBranches = branches
+      let currentCars = cars
+      
+      if (currentBranches.length === 0) {
+        console.log('Branches not loaded, fetching...')
+        currentBranches = await fetchBranches()
+        console.log('Fetched branches:', currentBranches)
+      }
+      if (currentCars.length === 0) {
+        console.log('Cars not loaded, fetching...')
+        currentCars = await fetchCars()
+      }
+      
       // Fetch the freshest driver record from the server
       const res = await apiService.getDriver(driver.driver_id)
-      const fresh = res.driver
-      setSelectedDriver(fresh as Driver)
+      console.log('handleEdit: raw getDriver response', res)
+      const freshRaw = res.driver || res
 
-      // populate the form with the DB values
+      // normalize fresh driver
+      const fresh = {
+        driver_id: freshRaw.driver_id,
+        full_name: freshRaw.full_name,
+        phone: freshRaw.phone,
+        license_number: freshRaw.license_number,
+        assigned_car: freshRaw.assigned_car ?? freshRaw.assigned_car_id ?? null,
+        branch_id: freshRaw.branch_id ?? freshRaw.branchId ?? '',
+        branch_name: freshRaw.branch_name ?? freshRaw.branch_name ?? '',
+        plate_number: freshRaw.plate_number ?? freshRaw.assigned_car_plate ?? null,
+        model: freshRaw.model ?? freshRaw.assigned_car_model ?? null,
+      } as Driver
+
+      // populate the form with the DB values immediately
+      console.log('handleEdit: normalized fresh driver', fresh)
       form.reset({
-        full_name: fresh.full_name || "",
-        phone: fresh.phone || "",
-        license_number: fresh.license_number || "",
-        // keep the Select sentinel when there's no assigned car
-        assigned_car: fresh.assigned_car ?? "none",
-        branch_id: fresh.branch_id || "",
+        full_name: fresh.full_name || '',
+        phone: fresh.phone || '',
+        license_number: fresh.license_number || '',
+        assigned_car: fresh.assigned_car ?? 'none',
+        branch_id: fresh.branch_id || '',
       })
 
-      // Set selectedDriver to trigger the useEffect that populates the form
-      setSelectedDriver(fresh as Driver)
+      // Also set individual values explicitly to avoid issues with custom inputs
+      try {
+        form.setValue('full_name', fresh.full_name || '')
+        form.setValue('phone', fresh.phone || '')
+        form.setValue('license_number', fresh.license_number || '')
+        form.setValue('assigned_car', fresh.assigned_car ?? 'none')
+        form.setValue('branch_id', fresh.branch_id || '')
+      } catch (e) {
+        console.warn('form.setValue failed (this may be fine on initial mount):', e)
+      }
+
+      // Set selected driver state for UI and dialog title
+      setSelectedDriver(fresh)
 
       // If the driver has an assigned car that isn't in our `cars` list (for example it's not 'available'),
       // fetch that car and add it so the Select can display the current assignment.
       if (fresh.assigned_car) {
-        const alreadyHas = cars.some((c) => c.car_id === fresh.assigned_car)
+  const alreadyHas = cars.some((c: Car) => c.car_id === fresh.assigned_car)
         if (!alreadyHas) {
           try {
             const { car } = await apiService.getCar(fresh.assigned_car)
-            // normalize shape to our Car type and prepend so it's visible
-            setCars((prev) => [
-              {
-                car_id: car.car_id,
-                plate_number: car.plate_number,
-                model: car.model,
-                status: car.status,
-              },
-              ...prev,
-            ])
+            console.log('handleEdit: fetched assigned car', car)
+            const normalizedCar = {
+              car_id: car.car_id ?? car.carId ?? car.id,
+              plate_number: (car.plate_number ?? car.plateNumber ?? car.plate) || '',
+              model: car.model ?? car.model_name ?? '',
+              status: car.status ?? 'busy',
+            }
+            // prepend and wait for state update (no direct await, but keep order before opening)
+            setCars((prev: Car[]) => [normalizedCar as Car, ...prev])
           } catch (err) {
-            // ignore fetch error; Select will show sentinel if we can't fetch the car
             console.warn('Failed to fetch assigned car', err)
           }
         }
       }
 
+      // Small tick to allow React to flush state updates (cars) before opening the dialog
+      await Promise.resolve()
+      console.log('form values after reset (before opening):', form.getValues())
+      console.log('Available branches:', currentBranches)
+      console.log('Selected branch_id:', fresh.branch_id)
+      console.log('Branch exists in list?', currentBranches.some(b => b.branch_id === fresh.branch_id))
+      
+      // Force update the branch_id after a tick to ensure Select is ready
+      setTimeout(() => {
+        if (fresh.branch_id) {
+          form.setValue('branch_id', fresh.branch_id, { shouldValidate: false, shouldDirty: true })
+          console.log('Force set branch_id to:', fresh.branch_id)
+        }
+      }, 100)
+      
       setDialogOpen(true)
     } catch (error) {
       toast({
@@ -281,6 +419,21 @@ export default function DriverManagementPage() {
       .join("")
       .toUpperCase()
   }
+
+  // Ensure the Select options always contain the currently assigned car (even if it's not in `cars`)
+  const mergedCars = (() => {
+    if (!selectedDriver || !selectedDriver.assigned_car) return cars
+    const has = cars.some((c) => c.car_id === selectedDriver.assigned_car)
+    if (has) return cars
+    // Build a minimal representation from selectedDriver to show in the list
+    const extra: Car = {
+      car_id: selectedDriver.assigned_car,
+      plate_number: selectedDriver.plate_number || selectedDriver.assigned_car,
+      model: selectedDriver.model || '',
+      status: 'assigned',
+    }
+    return [extra, ...cars]
+  })()
 
   return (
     <DashboardLayout>
@@ -324,10 +477,12 @@ export default function DriverManagementPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full Name</Label>
-                <Input
-                  id="full_name"
-                  {...form.register("full_name")}
-                  placeholder="Full Name"
+                <Controller
+                  control={form.control}
+                  name="full_name"
+                  render={({ field }) => (
+                    <Input id="full_name" {...field} placeholder="Full Name" />
+                  )}
                 />
                 {form.formState.errors.full_name && (
                   <p className="text-sm text-red-500">
@@ -338,10 +493,12 @@ export default function DriverManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  {...form.register("phone")}
-                  placeholder="+2507xxxxx"
+                <Controller
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <Input id="phone" {...field} placeholder="+2507xxxxx" />
+                  )}
                 />
                 {form.formState.errors.phone && (
                   <p className="text-sm text-red-500">
@@ -352,10 +509,12 @@ export default function DriverManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="license_number">License Number</Label>
-                <Input
-                  id="license_number"
-                  {...form.register("license_number")}
-                  placeholder="License Number"
+                <Controller
+                  control={form.control}
+                  name="license_number"
+                  render={({ field }) => (
+                    <Input id="license_number" {...field} placeholder="License Number" />
+                  )}
                 />
                 {form.formState.errors.license_number && (
                   <p className="text-sm text-red-500">
@@ -366,23 +525,29 @@ export default function DriverManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="assigned_car">Assigned Vehicle</Label>
-                <Select
-                  // Use a non-empty sentinel value for "no vehicle". Watch keeps the control in sync.
-                  value={form.watch("assigned_car") ?? "none"}
-                  onValueChange={(value) => form.setValue("assigned_car", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vehicle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {cars.map((car) => (
-                      <SelectItem key={car.car_id} value={car.car_id}>
-                        {car.plate_number} - {car.model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="assigned_car"
+                  render={({ field }) => (
+                    <Select key={field.value} value={field.value ?? "none"} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vehicle">
+                          {field.value && field.value !== "none" 
+                            ? mergedCars.find(c => c.car_id === field.value)?.plate_number || field.value
+                            : "None"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {mergedCars.map((car) => (
+                          <SelectItem key={car.car_id} value={car.car_id}>
+                            {car.plate_number} - {car.model} {car.status ? `— ${car.status}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {form.formState.errors.assigned_car && (
                   <p className="text-sm text-red-500">
                     {form.formState.errors.assigned_car.message}
@@ -392,21 +557,37 @@ export default function DriverManagementPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="branch">Assigned Branch</Label>
-                <Select
-                  value={form.watch("branch_id") || ""}
-                  onValueChange={(value) => form.setValue("branch_id", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.branch_id} value={branch.branch_id}>
-                        {branch.branch_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="branch_id"
+                  render={({ field }) => {
+                    console.log('Branch Select render - field.value:', field.value)
+                    console.log('Branch Select render - branches:', branches)
+                    const selectedBranch = branches.find(b => b.branch_id === field.value)
+                    console.log('Branch Select render - selectedBranch:', selectedBranch)
+                    
+                    return (
+                      <Select 
+                        value={field.value || undefined} 
+                        onValueChange={(value) => {
+                          console.log('Branch selected:', value)
+                          field.onChange(value)
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select branch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                              {branch.branch_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }}
+                />
                 {form.formState.errors.branch_id && (
                   <p className="text-sm text-red-500">
                     {form.formState.errors.branch_id.message}
@@ -427,18 +608,11 @@ export default function DriverManagementPage() {
             </form>
           </DialogContent>
         </Dialog>
+        {/* debug information is now logged to the browser console only */}
       </div>
 
       <div className="w-full rounded-lg border bg-card overflow-hidden">
-        {/* Header row for medium+ screens */}
-        <div className="hidden md:grid grid-cols-12 gap-4 p-3 text-sm font-medium text-muted-foreground bg-muted/5">
-          <div className="col-span-3">Driver</div>
-          <div className="col-span-2">Phone</div>
-          <div className="col-span-2">Branch</div>
-          <div className="col-span-2">Vehicle</div>
-          <div className="col-span-1">Status</div>
-          <div className="col-span-2 text-right">Actions</div>
-        </div>
+        {/* header labels removed per user request; compact list only */}
 
         <div className="divide-y">
           {loading ? (

@@ -27,7 +27,7 @@ export const carSchema = z.object({
   plate_number: z.string().min(6, "Plate number must be at least 6 characters"),
   model: z.string().min(2, "Model must be at least 2 characters"),
   capacity_kg: z.number().min(0, "Capacity must be positive"),
-  status: z.enum(["available", "in-use", "maintenance"]),
+  status: z.enum(["available", "in_transit", "maintenance", "retired"]),
   branch_id: z.string().min(1, "Branch must be selected"),
 })
 
