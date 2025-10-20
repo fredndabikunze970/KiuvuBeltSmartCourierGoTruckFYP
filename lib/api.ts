@@ -28,6 +28,7 @@ interface Package {
   driver_name?: string
   agent_id: string
   agent_name?: string
+  package_type?: "outgoing" | "incoming" | "other"
   created_at: string
   updated_at: string
   delivered_at?: string

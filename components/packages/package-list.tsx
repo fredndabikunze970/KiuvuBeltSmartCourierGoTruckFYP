@@ -67,6 +67,24 @@ const statusConfig = {
   },
 }
 
+const packageTypeConfig = {
+  outgoing: {
+    label: "Outgoing",
+    color: "bg-green-100 text-green-800 border-green-200",
+    icon: "📤"
+  },
+  incoming: {
+    label: "Incoming",
+    color: "bg-blue-100 text-blue-800 border-blue-200",
+    icon: "📥"
+  },
+  other: {
+    label: "Other",
+    color: "bg-gray-100 text-gray-800 border-gray-200",
+    icon: "📦"
+  },
+}
+
 const priorityConfig = {
   normal: {
     label: "Normal",
@@ -425,6 +443,14 @@ export function PackageList() {
                                   >
                                     {priority.label}
                                   </Badge>
+                                  {pkg.package_type && (
+                                    <Badge
+                                      variant="outline"
+                                      className={`${packageTypeConfig[pkg.package_type]?.color || "bg-gray-100 text-gray-800 border-gray-200"} font-medium text-xs`}
+                                    >
+                                      {packageTypeConfig[pkg.package_type]?.icon} {packageTypeConfig[pkg.package_type]?.label}
+                                    </Badge>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>

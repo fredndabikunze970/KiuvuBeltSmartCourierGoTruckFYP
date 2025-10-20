@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         `
       }
     } else if (user.role === "agent") {
-      // Agents see packages from their branch
+      // Agents see packages from their branch (both outgoing and incoming)
       if (status && search) {
         packages = await sql`
           SELECT
@@ -145,14 +145,20 @@ export async function GET(request: NextRequest) {
             db.branch_name as destination_branch_name,
             c.plate_number as car_plate_number,
             c.model as car_model,
-            d.full_name as driver_name
+            d.full_name as driver_name,
+            CASE
+              WHEN p.origin_branch_id = ${user.branch_id} THEN 'outgoing'
+              WHEN p.destination_branch_id = ${user.branch_id} THEN 'incoming'
+              ELSE 'other'
+            END as package_type
           FROM packages p
           LEFT JOIN users u ON p.agent_id = u.user_id
           LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
           LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
-          WHERE p.origin_branch_id = ${user.branch_id} AND p.status = ${status}
+          WHERE (p.origin_branch_id = ${user.branch_id} OR p.destination_branch_id = ${user.branch_id})
+          AND p.status = ${status}
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
@@ -167,14 +173,20 @@ export async function GET(request: NextRequest) {
             db.branch_name as destination_branch_name,
             c.plate_number as car_plate_number,
             c.model as car_model,
-            d.full_name as driver_name
+            d.full_name as driver_name,
+            CASE
+              WHEN p.origin_branch_id = ${user.branch_id} THEN 'outgoing'
+              WHEN p.destination_branch_id = ${user.branch_id} THEN 'incoming'
+              ELSE 'other'
+            END as package_type
           FROM packages p
           LEFT JOIN users u ON p.agent_id = u.user_id
           LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
           LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
-          WHERE p.origin_branch_id = ${user.branch_id} AND p.status = ${status}
+          WHERE (p.origin_branch_id = ${user.branch_id} OR p.destination_branch_id = ${user.branch_id})
+          AND p.status = ${status}
           ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
@@ -188,14 +200,19 @@ export async function GET(request: NextRequest) {
             db.branch_name as destination_branch_name,
             c.plate_number as car_plate_number,
             c.model as car_model,
-            d.full_name as driver_name
+            d.full_name as driver_name,
+            CASE
+              WHEN p.origin_branch_id = ${user.branch_id} THEN 'outgoing'
+              WHEN p.destination_branch_id = ${user.branch_id} THEN 'incoming'
+              ELSE 'other'
+            END as package_type
           FROM packages p
           LEFT JOIN users u ON p.agent_id = u.user_id
           LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
           LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
-          WHERE p.origin_branch_id = ${user.branch_id}
+          WHERE (p.origin_branch_id = ${user.branch_id} OR p.destination_branch_id = ${user.branch_id})
           AND (p.package_id ILIKE ${`%${search}%`} OR p.sender_name ILIKE ${`%${search}%`} OR p.receiver_name ILIKE ${`%${search}%`})
           ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
@@ -210,14 +227,19 @@ export async function GET(request: NextRequest) {
             db.branch_name as destination_branch_name,
             c.plate_number as car_plate_number,
             c.model as car_model,
-            d.full_name as driver_name
+            d.full_name as driver_name,
+            CASE
+              WHEN p.origin_branch_id = ${user.branch_id} THEN 'outgoing'
+              WHEN p.destination_branch_id = ${user.branch_id} THEN 'incoming'
+              ELSE 'other'
+            END as package_type
           FROM packages p
           LEFT JOIN users u ON p.agent_id = u.user_id
           LEFT JOIN branches ob ON p.origin_branch_id = ob.branch_id
           LEFT JOIN branches db ON p.destination_branch_id = db.branch_id
           LEFT JOIN cars c ON p.assigned_car = c.car_id
           LEFT JOIN drivers d ON p.assigned_driver = d.driver_id
-          WHERE p.origin_branch_id = ${user.branch_id}
+          WHERE (p.origin_branch_id = ${user.branch_id} OR p.destination_branch_id = ${user.branch_id})
           ${dateStart ? sql`AND p.created_at >= ${dateStart} AND p.created_at < ${dateEnd}` : sql``}
           ORDER BY p.created_at DESC
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
@@ -328,13 +350,13 @@ export async function GET(request: NextRequest) {
       }
     } else if (user.role === "agent") {
       if (status && search) {
-        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND status = ${status} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE (origin_branch_id = ${user.branch_id} OR destination_branch_id = ${user.branch_id}) AND status = ${status} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
       } else if (status) {
-        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND status = ${status} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE (origin_branch_id = ${user.branch_id} OR destination_branch_id = ${user.branch_id}) AND status = ${status} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
       } else if (search) {
-        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE (origin_branch_id = ${user.branch_id} OR destination_branch_id = ${user.branch_id}) AND (package_id ILIKE ${`%${search}%`} OR sender_name ILIKE ${`%${search}%`} OR receiver_name ILIKE ${`%${search}%`}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
       } else {
-        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE origin_branch_id = ${user.branch_id} ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
+        totalQuery = sql`SELECT COUNT(*) FROM packages WHERE (origin_branch_id = ${user.branch_id} OR destination_branch_id = ${user.branch_id}) ${dateStart ? sql`AND created_at >= ${dateStart} AND created_at < ${dateEnd}` : sql``}`
       }
     } else {
       if (status && search) {
