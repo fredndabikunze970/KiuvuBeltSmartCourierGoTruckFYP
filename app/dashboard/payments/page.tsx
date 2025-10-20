@@ -9,21 +9,29 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { authService } from "@/lib/auth"
+import { componentColors } from "@/lib/colors"
 import {
-    Building,
-    CheckCircle,
-    Clock,
-    CreditCard,
-    DollarSign,
-    Download,
-    Filter,
-    MoreVertical,
-    Search,
-    Smartphone,
-    User,
-    XCircle
+  Building,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Download,
+  Filter,
+  MoreVertical,
+  Search,
+  Smartphone,
+  User,
+  XCircle
 } from "lucide-react"
 import { useEffect, useState } from "react"
+
+// Status configuration for consistent styling using design system
+const STATUS_CONFIG = {
+  confirmed: { color: componentColors.badge.active, icon: CheckCircle, iconColor: 'text-green-600' },
+  pending: { color: componentColors.badge.pending, icon: Clock, iconColor: 'text-orange-600' },
+  failed: { color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle, iconColor: 'text-red-600' }
+};
 
 interface Payment {
   payment_id: string
@@ -385,11 +393,13 @@ export default function PaymentsPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Payment Management</h1>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Payment Management
+              </h2>
               <p className="text-gray-600 mt-1">Manage and confirm package payments</p>
             </div>
             <div className="flex gap-2">
-              <Button className="flex items-center gap-2" onClick={() => exportPaymentsReport()}>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" onClick={() => exportPaymentsReport()}>
                 <Download className="w-4 h-4" />
                 Export Report
               </Button>

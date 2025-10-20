@@ -222,7 +222,9 @@ export function UserManagement() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold sm:text-3xl">User Management</h2>
+         <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            User Management
+          </h2>
           <p className="text-muted-foreground text-sm sm:text-base">Manage system users and their permissions</p>
         </div>
         <Dialog open={showAddUser} onOpenChange={setShowAddUser}>

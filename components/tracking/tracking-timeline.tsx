@@ -1,6 +1,8 @@
 "use client"
 
 import type { TrackingEntry } from "@/lib/api"
+import { componentColors } from "@/lib/colors"
+import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Clock, Package, Truck, MapPin, Home, AlertCircle } from "lucide-react"
 
 interface TrackingTimelineProps {
@@ -11,11 +13,11 @@ export function TrackingTimeline({ tracking }: TrackingTimelineProps) {
     const getStatusIcon = (status: string) => {
         switch (status) {
             case "registered":
-                return <Package className="h-5 w-5 text-blue-600" />
+                return <Package className="h-5 w-5 text-gray-600" />
             case "picked_up":
-                return <Truck className="h-5 w-5 text-yellow-600" />
+                return <Truck className="h-5 w-5 text-orange-600" />
             case "in_transit":
-                return <Truck className="h-5 w-5 text-purple-600" />
+                return <Truck className="h-5 w-5 text-blue-600" />
             case "out_for_delivery":
                 return <MapPin className="h-5 w-5 text-orange-600" />
             case "delivered":
@@ -30,19 +32,19 @@ export function TrackingTimeline({ tracking }: TrackingTimelineProps) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case "registered":
-                return "bg-blue-100 text-blue-800"
+                return componentColors.badge.inactive
             case "picked_up":
-                return "bg-yellow-100 text-yellow-800"
+                return componentColors.badge.pending
             case "in_transit":
-                return "bg-purple-100 text-purple-800"
+                return componentColors.badge.agent
             case "out_for_delivery":
-                return "bg-orange-100 text-orange-800"
+                return componentColors.badge.outForDelivery
             case "delivered":
-                return "bg-green-100 text-green-800"
+                return componentColors.badge.active
             case "cancelled":
-                return "bg-red-100 text-red-800"
+                return componentColors.badge.admin
             default:
-                return "bg-gray-100 text-gray-800"
+                return componentColors.badge.inactive
         }
     }
 
@@ -107,10 +109,10 @@ export function TrackingTimeline({ tracking }: TrackingTimelineProps) {
                                 <Clock className="h-4 w-4" />
                                 <span>{formatDate(entry.created_at)}</span>
                             </div>
-                            {entry.location && (
+                            {entry.location_name && (
                                 <div className="flex items-center gap-1">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{entry.location}</span>
+                                    <span>{entry.location_name}</span>
                                 </div>
                             )}
                         </div>

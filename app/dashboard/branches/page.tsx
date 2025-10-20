@@ -3,13 +3,13 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -145,7 +145,9 @@ export default function BranchManagementPage() {
         <div className="container mx-auto py-6">
           <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Branch Management</h1>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Branches Management
+          </h2>
             <p className="text-muted-foreground">Manage your delivery branches and locations</p>
           </div>
           <DialogTrigger asChild>

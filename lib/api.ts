@@ -1,38 +1,15 @@
+import type {
+    BranchResponse,
+    CarResponse,
+    DriverResponse,
+    PackageRegistrationData,
+    PackageRegistrationResponse
+} from "./api-types"
 import { authService } from "./auth"
-
-interface Package {
-  id: number
-  package_id: string
-  pickup_code: string
-  sender_name: string
-  sender_phone: string
-  sender_address: string
-  receiver_name: string
-  receiver_phone: string
-  receiver_address: string
-  package_description?: string
-  weight?: number
-  dimensions?: string
-  declared_value?: number
-  delivery_fee: number
-  status: "registered" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "cancelled"
-  priority: "normal" | "express" | "urgent"
-  origin_branch_id?: string
-  origin_branch_name?: string
-  destination_branch_id?: string
-  destination_branch_name?: string
-  assigned_car?: string
-  car_plate_number?: string
-  car_model?: string
-  assigned_driver?: string
-  driver_name?: string
-  agent_id: string
-  agent_name?: string
-  package_type?: "outgoing" | "incoming" | "other"
-  created_at: string
-  updated_at: string
-  delivered_at?: string
-}
+import type {
+    Branch,
+    Package
+} from "./types"
 
 interface TrackingEntry {
   id: number
@@ -46,43 +23,6 @@ interface TrackingEntry {
   updated_by: string
   updated_by_name?: string
   created_at: string
-}
-
-interface Branch {
-  id: number
-  branch_id: string
-  branch_name: string
-  latitude: number
-  longitude: number
-  address: string
-  created_at: string
-  updated_at: string
-}
-
-interface Car {
-  id: number
-  car_id: string
-  plate_number: string
-  model: string
-  capacity_kg: number
-  status: "available" | "in-use" | "maintenance"
-  branch_id: string
-  branch_name: string
-  created_at: string
-  updated_at: string
-}
-
-interface Driver {
-  id: number
-  driver_id: string
-  full_name: string
-  phone: string
-  license_number: string
-  assigned_car: string | null
-  branch_id: string
-  branch_name: string
-  created_at: string
-  updated_at: string
 }
 
 interface Payment {
@@ -100,7 +40,12 @@ interface Payment {
 }
 
 class ApiService {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+
+  constructor() {
+    console.log("🔗 API Base URL:", this.baseUrl)
+    console.log("🔗 NEXT_PUBLIC_API_URL from env:", process.env.NEXT_PUBLIC_API_URL || "not set (using default)")
+  }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
@@ -124,25 +69,22 @@ class ApiService {
   }
 
   // Package API methods
-  async registerPackage(packageData: {
-    senderName: string
-    senderPhone: string
-    senderAddress: string
-    originBranchId: string
-    receiverName: string
-    receiverPhone: string
-    receiverAddress: string
-    destinationBranchId: string
-    packageDescription?: string
-    weight?: number
-    dimensions?: string
-    declaredValue?: number
-    deliveryFee: number
-    priority?: "normal" | "express" | "urgent"
-    assignedCarId?: string
-    assignedDriverId?: string
-    deliveryTime?: string
-  }): Promise<{ message: string; package: Package }> {
+    // Fleet management API methods
+  async getBranches(): Promise<BranchResponse> {
+      return this.request("/branches")
+  }
+
+  async getCars(params?: { branchId?: string }): Promise<CarResponse> {
+    const query = params?.branchId ? `?branch_id=${params.branchId}` : ""
+      return this.request(`/cars${query}`)
+  }
+
+  async getDrivers(params?: { branchId?: string }): Promise<DriverResponse> {
+    const query = params?.branchId ? `?branch_id=${params.branchId}` : ""
+      return this.request(`/drivers${query}`)
+  }
+
+  async registerPackage(packageData: PackageRegistrationData): Promise<PackageRegistrationResponse> {
     return this.request("/packages/register", {
       method: "POST",
       body: JSON.stringify(packageData),
@@ -154,7 +96,7 @@ class ApiService {
     agent_id?: string
     page?: number
     limit?: number
-    dateRange?: string
+    branchId?: string
   }): Promise<{
     packages: Package[]
     pagination: {
@@ -167,9 +109,15 @@ class ApiService {
     const searchParams = new URLSearchParams()
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString())
+        if (value === undefined) return
+
+        // map camelCase branchId to expected snake_case branch_id query param
+        if (key === 'branchId') {
+          searchParams.append('branch_id', value.toString())
+          return
         }
+
+        searchParams.append(key, value.toString())
       })
     }
 
@@ -177,33 +125,13 @@ class ApiService {
     return this.request(`/packages${query ? `?${query}` : ""}`)
   }
 
-  async getPackage(packageId: string): Promise<{ package: Package; tracking?: TrackingEntry[] }> {
-    return this.request(`/packages/${packageId}`)
+  // Branch helper
+  async getBranch(branchId: string): Promise<{ branch?: Branch }> {
+    return this.request(`/branches/${branchId}`)
   }
 
-  async updatePackage(packageId: string, data: Partial<{
-    sender_name: string
-    sender_phone: string
-    sender_address: string
-    receiver_name: string
-    receiver_phone: string
-    receiver_address: string
-    package_description: string
-    weight: number
-    dimensions: string
-    declared_value: number
-    delivery_fee: number
-    priority: "normal" | "express" | "urgent"
-    origin_branch_id: string
-    destination_branch_id: string
-    assigned_car: string
-    assigned_driver: string
-    delivery_time: string
-  }>): Promise<{ package: Package }> {
-    return this.request(`/packages/${packageId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+  async getPackage(packageId: string): Promise<{ package: Package }> {
+    return this.request(`/packages/${packageId}`)
   }
 
   async updatePackageStatus(
@@ -229,135 +157,6 @@ class ApiService {
     })
   }
 
-  // Branch API methods
-  async getBranches(): Promise<{ branches: Branch[] }> {
-    return this.request('/branches')
-  }
-
-  async getBranch(branchId: string): Promise<{ branch: Branch }> {
-    return this.request(`/branches/${branchId}`)
-  }
-
-  async createBranch(data: {
-    branch_name: string
-    latitude: string
-    longitude: string
-    address: string
-  }): Promise<{ branch: Branch }> {
-    return this.request('/branches', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async updateBranch(
-    branchId: string,
-    data: {
-      branch_name: string
-      latitude: string
-      longitude: string
-      address: string
-    }
-  ): Promise<{ branch: Branch }> {
-    return this.request(`/branches/${branchId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async deleteBranch(branchId: string): Promise<{ message: string }> {
-    return this.request(`/branches/${branchId}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // Car API methods
-  async getCars(): Promise<{ cars: Car[] }> {
-    return this.request('/cars')
-  }
-
-  async getCar(carId: string): Promise<{ car: Car }> {
-    return this.request(`/cars/${carId}`)
-  }
-
-  async createCar(data: {
-    plate_number: string
-    model: string
-    capacity_kg: number
-    branch_id: string
-  }): Promise<{ car: Car }> {
-    return this.request('/cars', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async updateCar(
-    carId: string,
-    data: {
-      plate_number: string
-      model: string
-      capacity_kg: number
-      status: string
-      branch_id: string
-    }
-  ): Promise<{ car: Car }> {
-    return this.request(`/cars/${carId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async deleteCar(carId: string): Promise<{ message: string }> {
-    return this.request(`/cars/${carId}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // Driver API methods
-  async getDrivers(): Promise<{ drivers: Driver[] }> {
-    return this.request('/drivers')
-  }
-
-  async getDriver(driverId: string): Promise<{ driver: Driver }> {
-    return this.request(`/drivers/${driverId}`)
-  }
-
-  async createDriver(data: {
-    full_name: string
-    phone: string
-    license_number: string
-    assigned_car: string | null
-    branch_id: string
-  }): Promise<{ driver: Driver }> {
-    return this.request('/drivers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async updateDriver(
-    driverId: string,
-    data: {
-      full_name: string
-      phone: string
-      license_number: string
-      assigned_car: string | null
-      branch_id: string
-    }
-  ): Promise<{ driver: Driver }> {
-    return this.request(`/drivers/${driverId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async deleteDriver(driverId: string): Promise<{ message: string }> {
-    return this.request(`/drivers/${driverId}`, {
-      method: 'DELETE',
-    })
-  }
-
   // Tracking API methods
   async getTracking(packageId: string): Promise<{
     package: Package
@@ -367,33 +166,7 @@ class ApiService {
       longitude: number
       timestamp: number
       lastUpdated: string
-      vehicleId?: string
-      address?: string
     }
-    locationHistory?: Array<{
-      latitude: number
-      longitude: number
-      timestamp: number
-      lastUpdated: string
-      speed?: number
-      heading?: number
-      accuracy?: number
-      address?: string
-    }>
-    originBranch?: any
-    destinationBranch?: any
-    route?: any
-    routePolyline?: any
-    routeDistance?: number
-    distanceTraveled?: number
-    distanceRemaining?: number
-    estimatedTime?: number
-    estimatedArrival?: string
-    isOnRoute?: boolean
-    progress?: number
-    paymentStatus?: string
-    paymentConfirmed?: boolean
-    allowTrackingWithoutPayment?: boolean
   }> {
     return this.request(`/tracking/${packageId}`)
   }
@@ -440,42 +213,9 @@ class ApiService {
     })
   }
 
-  // List/fetch payments with optional filters and dateRange
-  async getPayments(params?: {
-    packageId?: string
-    status?: string
-    page?: number
-    limit?: number
-    dateRange?: string
-  }): Promise<{
-    payments: Payment[]
-    pagination: {
-      page: number
-      limit: number
-      total: number
-      pages: number
-    }
-  }> {
-    const searchParams = new URLSearchParams()
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, value.toString())
-        }
-      })
-    }
-
-    const query = searchParams.toString()
-    return this.request(`/payments${query ? `?${query}` : ""}`)
-  }
-
-  async confirmPayment(
-    paymentId: string,
-    paymentMethod: "cash" | "mobile_money" | "bank_transfer" = "cash",
-  ): Promise<{ message: string; paymentId: string; confirmedBy: string }> {
+  async confirmPayment(paymentId: string): Promise<{ message: string; paymentId: string; confirmedBy: string }> {
     return this.request(`/payments/${paymentId}/confirm`, {
       method: "PUT",
-      body: JSON.stringify({ payment_method: paymentMethod }),
     })
   }
 
@@ -504,5 +244,5 @@ class ApiService {
 }
 
 export const apiService = new ApiService()
-export type { Branch, Car, Driver, Package, Payment, TrackingEntry }
+export type { Package, Payment, TrackingEntry }
 

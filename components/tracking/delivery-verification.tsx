@@ -2,15 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { apiService } from "@/lib/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, CheckCircle, Package } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { apiService } from "@/lib/api"
+import { CheckCircle, Loader2, Package } from "lucide-react"
+import { useState } from "react"
 
 export function DeliveryVerification() {
   const [formData, setFormData] = useState({
@@ -83,8 +83,8 @@ export function DeliveryVerification() {
   return (
     <Card className="w-full max-w-md mx-auto sm:max-w-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-2xl sm:text-3xl">
-          <Package className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <Package className="h-5 w-5 text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparentt" />
           Verify Delivery
         </CardTitle>
         <CardDescription className="text-sm sm:text-base">
@@ -103,7 +103,7 @@ export function DeliveryVerification() {
             <Label htmlFor="packageId">Package ID *</Label>
             <Input
               id="packageId"
-              placeholder="PKG-ABC123"
+              placeholder="PKG-XXXXX"
               value={formData.packageId}
               onChange={(e) => handleInputChange("packageId", e.target.value)}
               required

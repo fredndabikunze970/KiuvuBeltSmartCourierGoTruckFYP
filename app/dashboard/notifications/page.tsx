@@ -19,18 +19,14 @@ export default function NotificationsPage() {
                 <Bell className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Notifications
+          </h2>
                 <p className="text-gray-600 mt-1">Manage your notification preferences and history</p>
               </div>
             </div>
 
-            <Link
-              href="/dashboard/notifications/settings"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Settings className="h-4 w-4" />
-              Notification Settings
-            </Link>
+            
           </div>
 
           {/* Notification Center */}

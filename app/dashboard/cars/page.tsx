@@ -168,7 +168,9 @@ export default function CarManagementPage() {
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Car Fleet Management</h1>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Car Fleet Management
+          </h2>
           <p className="text-muted-foreground">Manage your delivery vehicles and assignments</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => setDialogOpen(v)}>

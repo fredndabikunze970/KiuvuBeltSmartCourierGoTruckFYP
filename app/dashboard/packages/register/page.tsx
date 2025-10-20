@@ -9,7 +9,9 @@ export default function DashboardRegisterPackagePage() {
         <div className="container mx-auto py-6">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-bold">Register New Package</h1>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Register New Package
+          </h2>
               <p className="text-muted-foreground">Create a new package for delivery</p>
             </div>
           </div>

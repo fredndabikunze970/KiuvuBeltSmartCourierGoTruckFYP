@@ -3,11 +3,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { authService } from '@/lib/auth';
+import { db } from '@/lib/firebase-client';
+import { onValue, ref } from 'firebase/database';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase-client';
-import { ref, onValue, off } from 'firebase/database';
-import { componentColors } from '@/lib/colors';
 
 // Dynamically import the enhanced map component
 const EnhancedRealTimeTrackingMap = dynamic(
@@ -840,22 +840,37 @@ export function EnhancedDashboardNew() {
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchDashboardStats = async () => {
-        try {
-            setRefreshing(true);
-            const response = await fetch('/api/dashboard/stats');
-            if (!response.ok) {
-                throw new Error('Failed to fetch dashboard stats');
+            try {
+                setRefreshing(true);
+
+                // Add Authorization header from authService (client-side token stored in localStorage)
+                const headers = authService.getAuthHeaders();
+
+                const response = await fetch('/api/dashboard/stats', {
+                    headers
+                });
+
+                if (response.status === 401) {
+                    setError('Unauthorized. Please login to access the dashboard.');
+                    setStats(null);
+                    return;
+                }
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || 'Failed to fetch dashboard stats');
+                }
+
+                const data = await response.json();
+                setStats(data);
+                setLastUpdated(new Date());
+                setError(null);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An error occurred');
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
             }
-            const data = await response.json();
-            setStats(data);
-            setLastUpdated(new Date());
-            setError(null);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
     };
 
     // Real-time Firebase listener for dashboard stats

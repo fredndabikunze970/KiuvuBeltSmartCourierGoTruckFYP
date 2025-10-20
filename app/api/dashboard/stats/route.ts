@@ -1,6 +1,7 @@
 import { sql } from '@/lib/database';
 import { database } from '@/lib/firebase';
-import { NextResponse } from 'next/server';
+import { getAuthUser } from '@/lib/auth-middleware';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Ensure this API is always dynamic and never cached
 export const dynamic = 'force-dynamic'
@@ -8,26 +9,55 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   let databaseError = null;
   let firebaseError = null;
 
   try {
     console.log('Starting dashboard stats API call...');
 
+    // Get authenticated user
+    const user = await getAuthUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Get total packages count and status distribution
     let packageStats;
     try {
       console.log('Fetching package stats from PostgreSQL...');
-      packageStats = await sql`
-        SELECT 
-          COUNT(*) as total_packages,
-          COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered,
-          COUNT(CASE WHEN status = 'in_transit' THEN 1 END) as in_transit,
-          COUNT(CASE WHEN status = 'registered' THEN 1 END) as registered,
-          COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) as out_for_delivery
-        FROM packages
-      `;
+
+      if (user.role === 'admin') {
+        packageStats = await sql`
+          SELECT
+            COUNT(*) as total_packages,
+            COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered,
+            COUNT(CASE WHEN status = 'in_transit' THEN 1 END) as in_transit,
+            COUNT(CASE WHEN status = 'registered' THEN 1 END) as registered,
+            COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) as out_for_delivery
+          FROM packages
+        `;
+      } else if (user.role === 'agent') {
+        packageStats = await sql`
+          SELECT
+            COUNT(*) as total_packages,
+            COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered,
+            COUNT(CASE WHEN status = 'in_transit' THEN 1 END) as in_transit,
+            COUNT(CASE WHEN status = 'registered' THEN 1 END) as registered,
+            COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) as out_for_delivery
+          FROM packages
+          WHERE origin_branch_id = ${user.branch_id} OR destination_branch_id = ${user.branch_id}
+        `;
+      } else {
+        // For other roles, return empty stats
+        packageStats = [{
+          total_packages: 0,
+          delivered: 0,
+          in_transit: 0,
+          registered: 0,
+          out_for_delivery: 0
+        }];
+      }
       console.log('Package stats query successful:', packageStats[0]);
     } catch (pkgError) {
       databaseError = `Package stats error: ${pkgError}`;
@@ -45,14 +75,35 @@ export async function GET() {
     let paymentStats;
     try {
       console.log('Fetching payment stats from PostgreSQL...');
-      paymentStats = await sql`
-        SELECT 
-          COUNT(*) as total_payments,
-          COALESCE(SUM(amount)::numeric, 0) as total_amount,
-          COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) as confirmed_payments,
-          COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_payments
-        FROM payments
-      `;
+
+      if (user.role === 'admin') {
+        paymentStats = await sql`
+          SELECT
+            COUNT(*) as total_payments,
+            COALESCE(SUM(amount)::numeric, 0) as total_amount,
+            COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) as confirmed_payments,
+            COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_payments
+          FROM payments
+        `;
+      } else if (user.role === 'agent') {
+        paymentStats = await sql`
+          SELECT
+            COUNT(p.*) as total_payments,
+            COALESCE(SUM(p.amount)::numeric, 0) as total_amount,
+            COUNT(CASE WHEN p.payment_status = 'confirmed' THEN 1 END) as confirmed_payments,
+            COUNT(CASE WHEN p.payment_status = 'pending' THEN 1 END) as pending_payments
+          FROM payments p
+          INNER JOIN packages pkg ON p.package_id = pkg.package_id
+          WHERE pkg.origin_branch_id = ${user.branch_id} OR pkg.destination_branch_id = ${user.branch_id}
+        `;
+      } else {
+        paymentStats = [{
+          total_payments: 0,
+          total_amount: 0,
+          confirmed_payments: 0,
+          pending_payments: 0
+        }];
+      }
       console.log('Payment stats query successful:', paymentStats[0]);
     } catch (payError) {
       databaseError = databaseError ? `${databaseError}; Payment stats error: ${payError}` : `Payment stats error: ${payError}`;
@@ -66,30 +117,71 @@ export async function GET() {
     }
 
     // Get recent packages with tracking and payment info
-    let recentPackagesResult;
-    let recentPackages = [];
+    let recentPackagesResult: any[];
+    let recentPackages: Array<{
+      package_id: string;
+      sender_name: string;
+      receiver_name: string;
+      status: string;
+      current_location: string;
+      payment_status: string;
+      created_at: string;
+      package_type: string;
+    }> = [];
     try {
       console.log('Fetching recent packages from PostgreSQL...');
-      recentPackagesResult = await sql`
-        SELECT 
-          p.package_id,
-          p.sender_name,
-          p.receiver_name,
-          p.status,
-          p.created_at,
-          t.status as current_status, 
-          t.location_name as current_location,
-          pay.payment_status
-        FROM packages p
-        LEFT JOIN (
-          SELECT DISTINCT ON (package_id) package_id, status, location_name
-          FROM tracking
-          ORDER BY package_id, created_at DESC
-        ) t ON p.package_id = t.package_id
-        LEFT JOIN payments pay ON p.package_id = pay.package_id
-        ORDER BY p.created_at DESC
-        LIMIT 6
-      `;
+
+      if (user.role === 'admin') {
+        recentPackagesResult = await sql`
+          SELECT
+            p.package_id,
+            p.sender_name,
+            p.receiver_name,
+            p.status,
+            p.created_at,
+            t.status as current_status,
+            t.location_name as current_location,
+            pay.payment_status
+          FROM packages p
+          LEFT JOIN (
+            SELECT DISTINCT ON (package_id) package_id, status, location_name
+            FROM tracking
+            ORDER BY package_id, created_at DESC
+          ) t ON p.package_id = t.package_id
+          LEFT JOIN payments pay ON p.package_id = pay.package_id
+          ORDER BY p.created_at DESC
+          LIMIT 6
+        `;
+      } else if (user.role === 'agent') {
+        recentPackagesResult = await sql`
+          SELECT
+            p.package_id,
+            p.sender_name,
+            p.receiver_name,
+            p.status,
+            p.created_at,
+            t.status as current_status,
+            t.location_name as current_location,
+            pay.payment_status,
+            CASE
+              WHEN p.origin_branch_id = ${user.branch_id} THEN 'outgoing'
+              WHEN p.destination_branch_id = ${user.branch_id} THEN 'incoming'
+              ELSE 'other'
+            END as package_type
+          FROM packages p
+          LEFT JOIN (
+            SELECT DISTINCT ON (package_id) package_id, status, location_name
+            FROM tracking
+            ORDER BY package_id, created_at DESC
+          ) t ON p.package_id = t.package_id
+          LEFT JOIN payments pay ON p.package_id = pay.package_id
+          WHERE p.origin_branch_id = ${user.branch_id} OR p.destination_branch_id = ${user.branch_id}
+          ORDER BY p.created_at DESC
+          LIMIT 6
+        `;
+      } else {
+        recentPackagesResult = [];
+      }
       console.log('Recent packages query successful, found:', recentPackagesResult?.length || 0, 'packages');
 
       // Format recent packages to match the expected interface
@@ -100,12 +192,22 @@ export async function GET() {
         status: pkg.current_status || pkg.status,
         current_location: pkg.current_location || 'Location not available',
         payment_status: pkg.payment_status || 'pending',
-        created_at: pkg.created_at ? new Date(pkg.created_at).toISOString() : new Date().toISOString()
+        created_at: pkg.created_at ? new Date(pkg.created_at).toISOString() : new Date().toISOString(),
+        package_type: pkg.package_type || 'other'
       }));
     } catch (recentError) {
       databaseError = databaseError ? `${databaseError}; Recent packages error: ${recentError}` : `Recent packages error: ${recentError}`;
       console.error('Recent packages query failed:', recentError);
-      recentPackages = [];
+      recentPackages = [] as Array<{
+        package_id: string;
+        sender_name: string;
+        receiver_name: string;
+        status: string;
+        current_location: string;
+        payment_status: string;
+        created_at: string;
+        package_type: string;
+      }>;
     }
 
     // Get fleet statistics from Firebase with enhanced data
@@ -239,7 +341,16 @@ export async function GET() {
         confirmed_payments: 0,
         pending_payments: 0
       },
-      recentPackages: [],
+      recentPackages: [] as Array<{
+        package_id: string;
+        sender_name: string;
+        receiver_name: string;
+        status: string;
+        current_location: string;
+        payment_status: string;
+        created_at: string;
+        package_type: string;
+      }>,
       fleetStats: {
         total_vehicles: 0,
         active_vehicles: 0,

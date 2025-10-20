@@ -48,6 +48,20 @@ export const colors = {
     900: '#78350f',  // Darkest amber
   },
 
+  // Orange Colors (Pending/Out for Delivery)
+  orange: {
+    50: '#fff7ed',   // Very light orange
+    100: '#ffedd5',  // Light orange
+    200: '#fed7aa',  // Lighter orange
+    300: '#fdba74',  // Light medium orange
+    400: '#fb923c',  // Medium orange
+    500: '#f97316',  // Pending orange
+    600: '#ea580c',  // Darker orange
+    700: '#c2410c',  // Dark orange
+    800: '#9a3412',  // Very dark orange
+    900: '#7c2d12',  // Darkest orange
+  },
+
   // Neutral Colors
   neutral: {
     50: '#fafafa',   // Very light gray
@@ -69,6 +83,7 @@ export const colors = {
     error: '#ef4444',      // Red for errors
     info: '#3b82f6',       // Blue for info
     pending: '#f59e0b',    // Amber for pending
+    outForDelivery: '#f97316', // Orange for out for delivery
     delivered: '#22c55e',  // Green for delivered
     inTransit: '#3b82f6',  // Blue for in transit
     failed: '#ef4444',     // Red for failed
@@ -136,11 +151,17 @@ export const colorClasses = {
   accentHover: 'hover:bg-amber-700 hover:text-amber-700',
   accentLight: 'bg-amber-50 text-amber-700 border-amber-200',
 
+  // Orange colors
+  orange: 'text-orange-600 bg-orange-600 border-orange-600',
+  orangeHover: 'hover:bg-orange-700 hover:text-orange-700',
+  orangeLight: 'bg-orange-50 text-orange-700 border-orange-200',
+
   // Status colors
   success: 'text-green-600 bg-green-100 border-green-300',
   warning: 'text-amber-600 bg-amber-100 border-amber-300',
   error: 'text-red-600 bg-red-100 border-red-300',
   info: 'text-blue-600 bg-blue-100 border-blue-300',
+  outForDelivery: 'text-orange-600 bg-orange-100 border-orange-300',
 
   // Neutral colors
   neutral: 'text-gray-600 bg-gray-100 border-gray-300',
@@ -204,6 +225,8 @@ export const componentColors = {
     receiver: 'bg-gray-100 text-gray-800 border-gray-200',
     active: 'bg-green-100 text-green-800 border-green-200',
     inactive: 'bg-gray-100 text-gray-800 border-gray-200',
+    pending: 'bg-orange-100 text-orange-800 border-orange-200',
+    outForDelivery: 'bg-orange-100 text-orange-800 border-orange-300',
   },
 
   // Alerts
