@@ -149,6 +149,30 @@ The USSD service handles various error scenarios:
 - **Location Unavailable**: Gracefully handles missing location data
 - **Server Errors**: Generic error message for system issues
 
+### Blocked tracking states
+
+If a package is already delivered or has arrived at its destination, real-time tracking is not available via USSD. In these cases the USSD endpoint will return the following message and end the session:
+
+```
+END Package is already delivered or arrived. Tracking is not available.
+```
+
+The server treats common status values (case-insensitive) such as `arrived`, `delivered`, `completed`, and `received` as blocked states.
+
+### Debugging package status
+
+For quick debugging there is a lightweight endpoint that returns the raw package row for a given tracking number:
+
+GET /api/ussd/debug?tracking=PKG001234
+
+This returns JSON like:
+
+```json
+{ "found": true, "tracking": "PKG001234", "status": "Delivered", "raw": { /* package row */ } }
+```
+
+Use the debug endpoint to confirm the DB status value if the USSD flow returns the generic error message.
+
 ## Security Considerations
 
 - USSD requests are logged for monitoring

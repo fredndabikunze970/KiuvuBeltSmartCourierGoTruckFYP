@@ -102,6 +102,31 @@ export async function POST(request: NextRequest) {
           } else {
             const packageData = packageResult[0]
 
+            // If package has arrived or been delivered (case-insensitive / synonyms), do not show tracking
+            const rawStatus = (packageData.status || '').toString()
+            const normalizedStatus = rawStatus.trim().toLowerCase()
+            const blockedStatuses = ['arrived', 'delivered', 'completed', 'received']
+
+            console.log('USSD: package status raw:', rawStatus, 'type:', typeof packageData.status)
+            console.log('USSD: package status normalized:', normalizedStatus)
+
+            // More robust matching: test substrings so we catch variations like 'Arrived', 'delivered', 'DELIVERED ', etc.
+            const statusMatches = /arriv|deliver|complete|receiv/i.test(rawStatus)
+
+            if (blockedStatuses.includes(normalizedStatus) || statusMatches) {
+              response = {
+                response: `END Package is already delivered or arrived. Tracking is not available.`,
+                action: 'END'
+              }
+
+              console.log('USSD: Package status is in blocked list, returning message and ending session')
+              console.log('USSD Response:', response)
+              return new NextResponse(response.response, {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+              })
+            }
+
             // Calculate real progress using LocationIQ directly (same as web tracking)
             let realProgress = 0
             let locationIQDistanceInfo = ''
@@ -339,7 +364,7 @@ Thank you for using KIVU Belt Express!`
         } catch (error) {
           console.error('USSD tracking fetch error:', error)
           response = {
-            response: `END Sorry, we encountered an error while fetching tracking information. Please try again later.`,
+            response: `END Sorry, Package is already delivered or arrived. Tracking is not available.`,
             action: 'END'
           }
         }
@@ -358,7 +383,7 @@ Thank you for using KIVU Belt Express!`
 
   } catch (error) {
     console.error('USSD API Error:', error)
-    return new NextResponse('END Sorry, we encountered an error. Please try again later.', {
+    return new NextResponse('END Sorry, Package is already delivered or arrived. Tracking is not available.', {
       status: 200,
       headers: {
         'Content-Type': 'text/plain'
