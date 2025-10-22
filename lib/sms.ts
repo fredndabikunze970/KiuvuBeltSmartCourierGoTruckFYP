@@ -81,9 +81,9 @@ export async function sendPackageNotification(
   location?: string,
 ): Promise<SMSResult> {
   // Use a real domain - NEVER use localhost in production
-  const trackingUrl = process.env.NEXT_PUBLIC_API_URL?.includes('localhost') 
-    ? `https://kivubelt.com/track/${trackingNumber}` // Replace with your real domain
-    : `${process.env.NEXT_PUBLIC_API_URL}/track/${trackingNumber}`;
+  const trackingUrl = process.env.NEXT_PUBLIC_API_TRACK?.includes('localhost') 
+    ? `https://kivubeltsmartcouriergotruck.onrender.com/track/${trackingNumber}` // Replace with your real domain
+    : `${process.env.NEXT_PUBLIC_API_TRACK}/track/${trackingNumber}`;
 
   let message = ""
 

@@ -2,6 +2,7 @@ import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 import { formatPhoneNumber } from "@/lib/utils"
 import { NextRequest, NextResponse } from "next/server"
+import { handlePackageArrival } from "@/lib/arrival-automation"
 
 function toRad(v: number) { return (v * Math.PI) / 180 }
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -190,58 +191,11 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
       }
     }
 
-    // 8) Arrival handling: when progress is 100% mark package as arrived and notify parties once
+    // 8) Arrival handling: when progress is 100% use centralized arrival automation
     if (progress === 100) {
       try {
-        // Only perform status update and notifications if package isn't already marked arrived
-        if (pkg.status !== 'arrived') {
-          await sql`
-            UPDATE packages
-            SET status = 'arrived', updated_at = NOW()
-            WHERE package_id = ${packageId}
-          `
-
-          // Ensure tracking records reflect full delivery (set any lower progress to 100)
-          await sql`
-            UPDATE tracking
-            SET progress_percentage = 100,
-                status = 'arrived'
-            WHERE package_id = ${packageId} AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
-          `
-
-          // Compose arrival messages. For Twilio trial accounts it's common to include a trial prefix
-          const publicBase = process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')
-            ? process.env.NEXT_PUBLIC_API_URL
-            : `https://kivubeltsmartcouriergotruck.onrender.com`
-
-          const trackingUrl = `${publicBase}/api/track/${packageId}`
-
-          // Receiver-friendly trial message (explicit per your request)
-          const arrivalMsgReceiver = `Twilio trial account - Receiver Update: KIVU Belt Express: Package ${packageId} is 100% complete. Track: ${trackingUrl}`
-
-          // Sender/professional message
-          const arrivalMsgSender = `KIVU Belt Express: Package ${packageId} has arrived at its destination. Track: ${trackingUrl}`
-
-          // Send receiver message (trial-formatted) only to receiver phone
-          if (pkg.receiver_phone) {
-            try {
-              const formattedReceiverPhone = formatPhoneNumber(pkg.receiver_phone)
-              await sendSMS({ to: formattedReceiverPhone, message: arrivalMsgReceiver })
-            } catch (err) {
-              console.error('Failed to send arrival SMS to receiver:', err)
-            }
-          }
-
-          // Optionally notify sender with a professional message
-          if (pkg.sender_phone) {
-            try {
-              const formattedSenderPhone = formatPhoneNumber(pkg.sender_phone)
-              await sendSMS({ to: formattedSenderPhone, message: arrivalMsgSender })
-            } catch (err) {
-              console.error('Failed to send arrival SMS to sender:', err)
-            }
-          }
-        }
+        // Use the centralized arrival handler which updates packages, tracking, and sends notifications
+        await handlePackageArrival(packageId, pkg)
       } catch (err) {
         console.error('Arrival handling failed:', err)
       }

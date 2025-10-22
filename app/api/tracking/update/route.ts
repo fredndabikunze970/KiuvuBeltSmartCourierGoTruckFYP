@@ -3,10 +3,11 @@ import { sql } from "@/lib/database"
 import { updatePackageLocation } from "@/lib/firebase"
 import { sendPackageNotification } from "@/lib/sms"
 import { requireAuth } from "@/lib/auth-middleware"
+import { checkAndHandleArrival } from "@/lib/arrival-automation"
 
 export const POST = requireAuth(async (request: NextRequest, user) => {
   try {
-    const { trackingNumber, status, location, latitude, longitude, notes } = await request.json()
+    const { trackingNumber, status, location, latitude, longitude, notes, progress_percentage } = await request.json()
 
     if (!trackingNumber || !status) {
       return NextResponse.json({ error: "Tracking number and status are required" }, { status: 400 })
@@ -30,11 +31,16 @@ export const POST = requireAuth(async (request: NextRequest, user) => {
       WHERE tracking_number = ${trackingNumber}
     `
 
-    // Add tracking entry
+    // Add tracking entry with progress percentage
     await sql`
-      INSERT INTO tracking (package_id, status, location, latitude, longitude, notes, created_at)
-      VALUES (${packageData.id}, ${status}, ${location}, ${latitude}, ${longitude}, ${notes}, NOW())
+      INSERT INTO tracking (package_id, status, location_name, latitude, longitude, notes, progress_percentage, created_at)
+      VALUES (${packageData.package_id}, ${status}, ${location}, ${latitude}, ${longitude}, ${notes}, ${progress_percentage || 0}, NOW())
     `
+
+    // Check if package has reached 100% and trigger arrival automation
+    if (progress_percentage === 100) {
+      await checkAndHandleArrival(packageData.package_id, progress_percentage)
+    }
 
     // Update real-time location in Firebase
     if (latitude && longitude) {
