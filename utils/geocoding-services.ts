@@ -16,6 +16,18 @@ class GeocodingService {
   private requestQueue: Array<() => Promise<void>> = [];
   private isProcessing = false;
 
+  // Retry / circuit breaker configuration
+  private readonly MAX_RETRIES = 4;
+  private readonly BASE_DELAY = 500; // ms base for backoff
+  private readonly MAX_BACKOFF = 60_000; // 60s
+
+  // Per-service state for circuit breaking and last request timestamp
+  private serviceState: Record<string, { failures: number; disabledUntil: number; lastRequestTime: number }> = {
+    locationiq: { failures: 0, disabledUntil: 0, lastRequestTime: 0 },
+    google: { failures: 0, disabledUntil: 0, lastRequestTime: 0 },
+    osm: { failures: 0, disabledUntil: 0, lastRequestTime: 0 }
+  };
+
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -44,6 +56,88 @@ class GeocodingService {
     return null;
   }
 
+  // Generic fetch with retries, exponential backoff with jitter, and Retry-After handling
+  private async fetchWithRetries(url: string, opts: RequestInit = {}, serviceKey = 'unknown'): Promise<Response> {
+    const now = Date.now();
+    const state = this.serviceState[serviceKey] ?? { failures: 0, disabledUntil: 0, lastRequestTime: 0 };
+
+    if (state.disabledUntil && state.disabledUntil > now) {
+      throw new Error(`${serviceKey} temporarily disabled until ${new Date(state.disabledUntil).toISOString()}`);
+    }
+
+    let attempt = 0;
+    let lastErr: any = null;
+
+    while (attempt <= this.MAX_RETRIES) {
+      attempt++;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000 + attempt * 2000);
+      try {
+        // Throttle per-service to avoid immediate bursts
+        const timeSinceLast = Date.now() - (state.lastRequestTime || 0);
+        if (timeSinceLast < this.MIN_INTERVAL) {
+          await this.delay(this.MIN_INTERVAL - timeSinceLast);
+        }
+
+        const response = await fetch(url, { signal: controller.signal, ...opts });
+        clearTimeout(timeout);
+
+        // Update last request time on any response
+        state.lastRequestTime = Date.now();
+        this.serviceState[serviceKey] = state;
+
+        if (response.status === 429) {
+          // Respect Retry-After header when provided
+          const retryAfter = response.headers.get('Retry-After');
+          let waitMs = Math.min(this.BASE_DELAY * 2 ** attempt, this.MAX_BACKOFF);
+          if (retryAfter) {
+            const parsed = parseInt(retryAfter, 10);
+            if (!Number.isNaN(parsed)) {
+              waitMs = Math.max(waitMs, parsed * 1000);
+            } else {
+              const date = Date.parse(retryAfter);
+              if (!Number.isNaN(date)) {
+                waitMs = Math.max(waitMs, date - Date.now());
+              }
+            }
+          }
+
+          // Mark a failure and possibly open circuit if repeated
+          state.failures = (state.failures || 0) + 1;
+          const cooldown = Math.min(30_000 * state.failures, this.MAX_BACKOFF);
+          if (state.failures >= 3) {
+            state.disabledUntil = Date.now() + cooldown;
+            console.warn(`${serviceKey} disabled for ${cooldown}ms after ${state.failures} consecutive 429s`);
+          }
+          this.serviceState[serviceKey] = state;
+
+          lastErr = new Error(`429 Too Many Requests from ${serviceKey}`);
+          // jitter
+          const jitter = Math.floor(Math.random() * 1000);
+          await this.delay(waitMs + jitter);
+          continue;
+        }
+
+        // Reset failure counter on success (2xx/3xx/4xx where not 429 considered success for circuit)
+        state.failures = 0;
+        state.disabledUntil = 0;
+        this.serviceState[serviceKey] = state;
+
+        return response;
+      } catch (err: any) {
+        clearTimeout(timeout);
+        lastErr = err;
+        // If aborted treat as a transient network error and retry
+        const backoff = Math.min(this.BASE_DELAY * 2 ** attempt, this.MAX_BACKOFF);
+        const jitter = Math.floor(Math.random() * 500);
+        await this.delay(backoff + jitter);
+        continue;
+      }
+    }
+
+    throw lastErr ?? new Error('Unknown fetch error');
+  }
+
   private async tryLocationIQ(latitude: number, longitude: number): Promise<GeocodingResult | null> {
     const API_KEY = process.env.NEXT_PUBLIC_LOCATIONIQ_KEY;
     
@@ -51,37 +145,27 @@ class GeocodingService {
       return null;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
+    const url = `https://us1.locationiq.com/v1/reverse.php?key=${API_KEY}&lat=${latitude}&lon=${longitude}&format=json&zoom=16&addressdetails=1`;
     try {
-      const response = await fetch(
-        `https://us1.locationiq.com/v1/reverse.php?key=${API_KEY}&lat=${latitude}&lon=${longitude}&format=json&zoom=16&addressdetails=1`,
-        {
-          signal: controller.signal
-        }
-      );
-
-      clearTimeout(timeoutId);
-
+      const response = await this.fetchWithRetries(url, {}, 'locationiq');
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error('LocationIQ rate limit exceeded');
+          console.warn('LocationIQ returned 429');
+        } else {
+          console.warn(`LocationIQ unexpected status ${response.status}`);
         }
-        throw new Error(`LocationIQ API error: ${response.status}`);
+        return null;
       }
-
       const data = await response.json();
-
       if (data && data.display_name) {
         return this.formatLocationIQResult(data);
       }
+      return null;
     } catch (error) {
-      console.warn('LocationIQ geocoding failed:', error);
-      throw error;
+      const msg = (error as any)?.message ?? String(error);
+      console.warn('LocationIQ geocoding failed:', msg);
+      return null;
     }
-
-    return null;
   }
 
   private async tryGoogleGeocoding(latitude: number, longitude: number): Promise<GeocodingResult | null> {
@@ -91,73 +175,51 @@ class GeocodingService {
       return null;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${API_KEY}`;
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${API_KEY}`,
-        {
-          signal: controller.signal
-        }
-      );
-
-      clearTimeout(timeoutId);
-
+      const response = await this.fetchWithRetries(url, {}, 'google');
       if (!response.ok) {
-        throw new Error(`Google API error: ${response.status}`);
+        console.warn(`Google Geocoding returned ${response.status}`);
+        return null;
       }
-
       const data = await response.json();
-
       if (data.status === 'OK' && data.results && data.results.length > 0) {
         return this.formatGoogleResult(data.results[0]);
       }
+      return null;
     } catch (error) {
-      console.warn('Google geocoding failed:', error);
-      throw error;
+      const msg = (error as any)?.message ?? String(error);
+      console.warn('Google geocoding failed:', msg);
+      return null;
     }
-
-    return null;
   }
 
   private async tryOpenStreetMap(latitude: number, longitude: number): Promise<GeocodingResult | null> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`;
+    const opts: RequestInit = {
+      headers: {
+        'User-Agent': 'DeliveryDashboard/1.0',
+        'Accept-Language': 'en',
+        'Referer': 'http://localhost:3000'
+      }
+    };
 
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
-        {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'DeliveryDashboard/1.0',
-            'Accept-Language': 'en',
-            'Referer': 'http://localhost:3000'
-          }
-        }
-      );
-
-      clearTimeout(timeoutId);
-
+      const response = await this.fetchWithRetries(url, opts, 'osm');
       if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('OpenStreetMap rate limit exceeded');
-        }
-        throw new Error(`OSM API error: ${response.status}`);
+        console.warn(`OSM returned ${response.status}`);
+        return null;
       }
-
       const data = await response.json();
-
       if (data && data.display_name) {
         return this.formatOpenStreetMapResult(data);
       }
+      return null;
     } catch (error) {
-      console.warn('OpenStreetMap geocoding failed:', error);
-      throw error;
+      const msg = (error as any)?.message ?? String(error);
+      console.warn('OpenStreetMap geocoding failed:', msg);
+      return null;
     }
-
-    return null;
   }
 
   private formatLocationIQResult(data: any): GeocodingResult {

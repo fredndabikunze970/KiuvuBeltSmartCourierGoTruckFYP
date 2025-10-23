@@ -1,8 +1,8 @@
+import { handlePackageArrival, runArrivalUpdate } from "@/lib/arrival-automation"
 import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 import { formatPhoneNumber } from "@/lib/utils"
 import { NextRequest, NextResponse } from "next/server"
-import { handlePackageArrival } from "@/lib/arrival-automation"
 
 function toRad(v: number) { return (v * Math.PI) / 180 }
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -194,8 +194,23 @@ export async function GET(req: NextRequest, { params }: { params: { packageId: s
     // 8) Arrival handling: when progress is 100% use centralized arrival automation
     if (progress === 100) {
       try {
-        // Use the centralized arrival handler which updates packages, tracking, and sends notifications
-        await handlePackageArrival(packageId, pkg)
+        // First run the atomic DB update to ensure packages/tracking are updated
+        const res = await runArrivalUpdate(packageId)
+        const row = res && res[0] ? res[0] as any : { pkg_updated: 0, tracking_updated: 0, new_tracking_id: null }
+        console.debug('runArrivalUpdate result for', packageId, row)
+
+        const pkgUpdated = Number(row.pkg_updated || 0)
+        const trackingUpdated = Number(row.tracking_updated || 0)
+        const newTrackingId = row.new_tracking_id || null
+
+        if (pkgUpdated > 0 || trackingUpdated > 0 || newTrackingId) {
+          // DB updates succeeded — now trigger arrival notifications via centralized handler.
+          // Call without passing stale pkg so the handler fetches fresh package state.
+          await handlePackageArrival(packageId)
+        } else {
+          // No DB changes — warn and do not send SMS to avoid sending inconsistent notifications.
+          console.warn(`Arrival automation made no DB changes for ${packageId}; skipping notifications to avoid inconsistency.`)
+        }
       } catch (err) {
         console.error('Arrival handling failed:', err)
       }

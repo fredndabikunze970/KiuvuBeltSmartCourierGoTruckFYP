@@ -7,6 +7,8 @@
     "db:migrate": "node scripts/run-migrations.js",
     "db:seed": "node scripts/seed-database.js",
     "dev": "next dev",
+  "arrival:check": "node scripts/run-arrival-check.js",
+  "run-arrival-check": "node scripts/run-arrival-check.js",
     "auto-fetch": "node scripts/auto-fetch-runner.js",
     "lint": "next lint",
     "start": "next start"

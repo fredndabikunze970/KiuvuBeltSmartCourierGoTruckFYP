@@ -1,9 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { handlePackageArrival, runArrivalUpdate } from "@/lib/arrival-automation"
+import { requireAuth } from "@/lib/auth-middleware"
 import { sql } from "@/lib/database"
 import { updatePackageLocation } from "@/lib/firebase"
 import { sendPackageNotification } from "@/lib/sms"
-import { requireAuth } from "@/lib/auth-middleware"
-import { checkAndHandleArrival } from "@/lib/arrival-automation"
+import { type NextRequest, NextResponse } from "next/server"
 
 export const POST = requireAuth(async (request: NextRequest, user) => {
   try {
@@ -39,7 +39,24 @@ export const POST = requireAuth(async (request: NextRequest, user) => {
 
     // Check if package has reached 100% and trigger arrival automation
     if (progress_percentage === 100) {
-      await checkAndHandleArrival(packageData.package_id, progress_percentage)
+      // Run the atomic DB update first (updates packages and tracking)
+      try {
+        const res = await runArrivalUpdate(packageData.package_id)
+        const row = res && res[0] ? res[0] as any : { pkg_updated: 0, tracking_updated: 0, new_tracking_id: null }
+        const pkgUpdated = Number(row.pkg_updated || 0)
+        const trackingUpdated = Number(row.tracking_updated || 0)
+        const newTrackingId = row.new_tracking_id || null
+
+        if (pkgUpdated > 0 || trackingUpdated > 0 || newTrackingId) {
+          // DB changes applied; call centralized handler to send SMS and any additional side-effects.
+          await handlePackageArrival(packageData.package_id)
+        } else {
+          // No DB changes — log and skip notifications to avoid duplicates/inconsistency
+          console.warn(`Arrival automation: no DB changes for ${packageData.package_id}; skipping arrival notifications.`)
+        }
+      } catch (err) {
+        console.error('Arrival automation failed during update:', err)
+      }
     }
 
     // Update real-time location in Firebase
@@ -55,11 +72,13 @@ export const POST = requireAuth(async (request: NextRequest, user) => {
       }
     }
 
-    // Send SMS notifications
-    try {
-      await sendPackageNotification(packageData.receiver_phone, trackingNumber, status, location)
-    } catch (error) {
-      console.error("SMS notification failed:", error)
+    // Send SMS notifications for non-arrival updates only (arrival notifications are handled centrally)
+    if (status !== 'arrived') {
+      try {
+        await sendPackageNotification(packageData.receiver_phone, trackingNumber, status, location)
+      } catch (error) {
+        console.error("SMS notification failed:", error)
+      }
     }
 
     return NextResponse.json({

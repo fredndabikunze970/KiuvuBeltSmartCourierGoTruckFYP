@@ -55,8 +55,7 @@ export async function handlePackageArrival(
         UPDATE tracking
         SET progress_percentage = 100,
             status = 'arrived',
-            notes = CASE WHEN notes IS NULL OR notes = '' THEN 'Package successfully arrived at destination' ELSE notes || ' | Package successfully arrived at destination' END,
-            updated_by = COALESCE(updated_by, 'system')
+            notes = CASE WHEN notes IS NULL OR notes = '' THEN 'Package successfully arrived at destination' ELSE notes || ' | Package successfully arrived at destination' END
         WHERE package_id = ${packageId}
           AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
         RETURNING id
@@ -207,7 +206,7 @@ export async function runArrivalUpdate(packageId: string) {
     ),
     ins AS (
       INSERT INTO tracking (package_id, status, location_name, progress_percentage, notes, updated_by)
-      SELECT ${packageId}, 'arrived', ${receiverLocation}, 100, 'Package successfully arrived at destination - Delivery complete', 'system'
+      SELECT ${packageId}, 'arrived', ${receiverLocation}, 100, 'Package successfully arrived at destination - Delivery complete', NULL
       WHERE NOT EXISTS (
         SELECT 1 FROM tracking WHERE package_id = ${packageId} AND status = 'arrived' AND progress_percentage = 100
       )
