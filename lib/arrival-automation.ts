@@ -1,4 +1,4 @@
-import { db, sql } from "@/lib/database"
+import { sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 
 /**
@@ -39,55 +39,58 @@ export async function handlePackageArrival(
 
     console.log(`Processing arrival for package ${packageId}`)
 
-    // Perform database updates in a single transaction to ensure consistency
-    try {
-      await db.query('BEGIN')
+    // Perform updates using a single atomic SQL statement (safer for serverless DBs)
+    // This updates packages, updates existing tracking rows and conditionally inserts
+    // a final tracking record only if one with arrived & 100 doesn't already exist.
+    const receiverLocation = pkg.receiver_address || 'Destination'
 
-      // Lock the package row to avoid race conditions
-      const packagesRes = await db.query('SELECT * FROM packages WHERE package_id = $1 FOR UPDATE', [packageId])
-      if (packagesRes.length === 0) {
-        await db.query('ROLLBACK')
-        console.error(`Package ${packageId} not found during transaction`)
-        return false
-      }
-
-      // If already arrived, rollback and skip
-      if (packagesRes[0].status === 'arrived') {
-        await db.query('ROLLBACK')
-        console.log(`Package ${packageId} was already marked arrived inside transaction`)
-        return true
-      }
-
-      // 1) Update packages
-      await db.query('UPDATE packages SET status = $1, updated_at = NOW(), delivered_at = NOW() WHERE package_id = $2', ['arrived', packageId])
-
-      // 2) Update existing tracking rows for this package to arrived where necessary
-      await db.query(
-        `UPDATE tracking
-         SET progress_percentage = 100,
-             status = $1,
-             notes = CASE WHEN notes IS NULL OR notes = '' THEN $2 ELSE notes || ' | ' || $2 END,
-             updated_by = COALESCE(updated_by, 'system')
-         WHERE package_id = $3
-           AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM $1)`,
-        ['arrived', 'Package successfully arrived at destination', packageId]
+    const result = await sql`
+      WITH upd_pkg AS (
+        UPDATE packages
+        SET status = 'arrived', updated_at = NOW(), delivered_at = NOW()
+        WHERE package_id = ${packageId} AND (status IS DISTINCT FROM 'arrived')
+        RETURNING package_id
+      ),
+      upd_tracking AS (
+        UPDATE tracking
+        SET progress_percentage = 100,
+            status = 'arrived',
+            notes = CASE WHEN notes IS NULL OR notes = '' THEN 'Package successfully arrived at destination' ELSE notes || ' | Package successfully arrived at destination' END,
+            updated_by = COALESCE(updated_by, 'system')
+        WHERE package_id = ${packageId}
+          AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
+        RETURNING id
+      ),
+      ins AS (
+        INSERT INTO tracking (package_id, status, location_name, progress_percentage, notes, updated_by)
+        SELECT ${packageId}, 'arrived', ${receiverLocation}, 100, 'Package successfully arrived at destination - Delivery complete', 'system'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM tracking WHERE package_id = ${packageId} AND status = 'arrived' AND progress_percentage = 100
+        )
+        RETURNING id, created_at
       )
+      SELECT (SELECT count(*) FROM upd_pkg) AS pkg_updated,
+             (SELECT count(*) FROM upd_tracking) AS tracking_updated,
+             (SELECT id FROM ins) AS new_tracking_id;
+    `
 
-      // 3) Insert a final tracking entry to record the arrival
-      const insertRes = await db.query(
-        `INSERT INTO tracking (package_id, status, location_name, progress_percentage, notes, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, created_at`,
-        [packageId, 'arrived', pkg.receiver_address || 'Destination', 100, 'Package successfully arrived at destination - Delivery complete', 'system']
-      )
+    const row = result && result[0] ? result[0] as any : { pkg_updated: 0, tracking_updated: 0, new_tracking_id: null }
+    const pkgUpdated = Number(row.pkg_updated || 0)
+    const trackingUpdated = Number(row.tracking_updated || 0)
+    const newTrackingId = row.new_tracking_id || null
 
-      await db.query('COMMIT')
-      console.log(`✓ Database updates committed for ${packageId}`)
-    } catch (err) {
-      try { await db.query('ROLLBACK') } catch (e) { /* ignore rollback errors */ }
-      console.error(`Transaction failed for package ${packageId}:`, err)
-      return false
+  // Debug: log raw result for troubleshooting
+  console.debug('arrival automation SQL result row:', row)
+
+    if (pkgUpdated === 0 && trackingUpdated === 0 && !newTrackingId) {
+      console.log(`No database changes were necessary for package ${packageId}`)
+      // Still proceed to return true: nothing to do
+    } else {
+      console.log(`✓ Database updated for ${packageId} (packages: ${pkgUpdated}, tracking rows updated: ${trackingUpdated}, new tracking id: ${newTrackingId})`)
     }
+
+    // Exportable helper (for debugging/testing) - runs the same SQL and returns the raw result
+    // Note: we don't call it here; it's exported below.
 
     // 4. Send SMS notifications to both parties (best-effort; failure doesn't rollback DB)
     const publicBase = process.env.NEXT_PUBLIC_TRACK && !process.env.NEXT_PUBLIC_TRACK.includes('localhost')
@@ -175,4 +178,46 @@ export async function checkAndHandleArrival(
     console.log(`Package ${packageId} reached 100% progress - triggering arrival automation`)
     await handlePackageArrival(packageId)
   }
+}
+
+/**
+ * Helper to run the arrival SQL block directly and return raw result.
+ * Useful for debugging from a script or REPL.
+ */
+export async function runArrivalUpdate(packageId: string) {
+  const receiverLocationRow = await sql`SELECT receiver_address FROM packages WHERE package_id = ${packageId}`
+  const receiverLocation = receiverLocationRow && receiverLocationRow[0] ? receiverLocationRow[0].receiver_address || 'Destination' : 'Destination'
+
+  const result = await sql`
+    WITH upd_pkg AS (
+      UPDATE packages
+      SET status = 'arrived', updated_at = NOW(), delivered_at = NOW()
+      WHERE package_id = ${packageId} AND (status IS DISTINCT FROM 'arrived')
+      RETURNING package_id
+    ),
+    upd_tracking AS (
+      UPDATE tracking
+      SET progress_percentage = 100,
+          status = 'arrived',
+          notes = CASE WHEN notes IS NULL OR notes = '' THEN 'Package successfully arrived at destination' ELSE notes || ' | Package successfully arrived at destination' END,
+          updated_by = COALESCE(updated_by, 'system')
+      WHERE package_id = ${packageId}
+        AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
+      RETURNING id
+    ),
+    ins AS (
+      INSERT INTO tracking (package_id, status, location_name, progress_percentage, notes, updated_by)
+      SELECT ${packageId}, 'arrived', ${receiverLocation}, 100, 'Package successfully arrived at destination - Delivery complete', 'system'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM tracking WHERE package_id = ${packageId} AND status = 'arrived' AND progress_percentage = 100
+      )
+      RETURNING id, created_at
+    )
+    SELECT (SELECT count(*) FROM upd_pkg) AS pkg_updated,
+           (SELECT count(*) FROM upd_tracking) AS tracking_updated,
+           (SELECT id FROM ins) AS new_tracking_id;
+  `
+
+  console.debug('runArrivalUpdate SQL result:', result && result[0])
+  return result
 }
