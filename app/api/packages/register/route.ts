@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const packageData = result[0];
-      const trackingUrl = `${process.env.NEXT_PUBLIC_API_URL}/track/${packageData.package_id}`;
+      const trackingUrl = `${process.env.NEXT_PUBLIC_API_TRACK}/track/${packageData.package_id}`;
       console.log('📱 Preparing to send SMS notifications...');
 
       // Format phone numbers (remove spaces, ensure +250 prefix)

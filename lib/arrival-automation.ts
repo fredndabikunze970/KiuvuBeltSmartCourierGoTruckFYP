@@ -1,4 +1,4 @@
-import { sql } from "@/lib/database"
+import { db, sql } from "@/lib/database"
 import { sendSMS } from "@/lib/sms"
 
 /**
@@ -39,58 +39,57 @@ export async function handlePackageArrival(
 
     console.log(`Processing arrival for package ${packageId}`)
 
-    // 1. Update packages table
-    await sql`
-      UPDATE packages
-      SET 
-        status = 'arrived',
-        updated_at = NOW(),
-        delivered_at = NOW()
-      WHERE package_id = ${packageId}
-    `
-    console.log(`✓ Updated packages table for ${packageId}`)
+    // Perform database updates in a single transaction to ensure consistency
+    try {
+      await db.query('BEGIN')
 
-    // 2. Update tracking table - ensure all records show arrived status
-    await sql`
-      UPDATE tracking
-      SET 
-        progress_percentage = 100,
-        status = 'arrived',
-        notes = CASE 
-          WHEN notes IS NULL OR notes = '' 
-          THEN 'Package successfully arrived at destination' 
-          ELSE notes || ' | Package successfully arrived at destination'
-        END
-      WHERE package_id = ${packageId} 
-        AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM 'arrived')
-    `
-    console.log(`✓ Updated tracking table for ${packageId}`)
+      // Lock the package row to avoid race conditions
+      const packagesRes = await db.query('SELECT * FROM packages WHERE package_id = $1 FOR UPDATE', [packageId])
+      if (packagesRes.length === 0) {
+        await db.query('ROLLBACK')
+        console.error(`Package ${packageId} not found during transaction`)
+        return false
+      }
 
-    // 3. Add a final tracking entry to log the arrival
-    await sql`
-      INSERT INTO tracking (
-        package_id, 
-        status, 
-        location_name, 
-        progress_percentage, 
-        notes, 
-        updated_by,
-        latitude,
-        longitude
-      ) VALUES (
-        ${packageId},
-        'arrived',
-        ${pkg.receiver_address || 'Destination'},
-        100,
-        'Package successfully arrived at destination - Delivery complete',
-        'system',
-        ${pkg.destination_latitude || null},
-        ${pkg.destination_longitude || null}
+      // If already arrived, rollback and skip
+      if (packagesRes[0].status === 'arrived') {
+        await db.query('ROLLBACK')
+        console.log(`Package ${packageId} was already marked arrived inside transaction`)
+        return true
+      }
+
+      // 1) Update packages
+      await db.query('UPDATE packages SET status = $1, updated_at = NOW(), delivered_at = NOW() WHERE package_id = $2', ['arrived', packageId])
+
+      // 2) Update existing tracking rows for this package to arrived where necessary
+      await db.query(
+        `UPDATE tracking
+         SET progress_percentage = 100,
+             status = $1,
+             notes = CASE WHEN notes IS NULL OR notes = '' THEN $2 ELSE notes || ' | ' || $2 END,
+             updated_by = COALESCE(updated_by, 'system')
+         WHERE package_id = $3
+           AND (progress_percentage IS NULL OR progress_percentage < 100 OR status IS DISTINCT FROM $1)`,
+        ['arrived', 'Package successfully arrived at destination', packageId]
       )
-    `
-    console.log(`✓ Added final tracking entry for ${packageId}`)
 
-    // 4. Send SMS notifications to both parties
+      // 3) Insert a final tracking entry to record the arrival
+      const insertRes = await db.query(
+        `INSERT INTO tracking (package_id, status, location_name, progress_percentage, notes, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, created_at`,
+        [packageId, 'arrived', pkg.receiver_address || 'Destination', 100, 'Package successfully arrived at destination - Delivery complete', 'system']
+      )
+
+      await db.query('COMMIT')
+      console.log(`✓ Database updates committed for ${packageId}`)
+    } catch (err) {
+      try { await db.query('ROLLBACK') } catch (e) { /* ignore rollback errors */ }
+      console.error(`Transaction failed for package ${packageId}:`, err)
+      return false
+    }
+
+    // 4. Send SMS notifications to both parties (best-effort; failure doesn't rollback DB)
     const publicBase = process.env.NEXT_PUBLIC_TRACK && !process.env.NEXT_PUBLIC_TRACK.includes('localhost')
       ? process.env.NEXT_PUBLIC_API_TRACK
       : `https://kivubeltsmartcouriergotruck.onrender.com/track`
