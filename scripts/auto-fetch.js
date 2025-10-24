@@ -13,6 +13,6 @@ setInterval(async () => {
   } catch (error) {
     console.error('Error fetching API:', error);
   }
-}, 30000); // 30 seconds
+}, 50000); // 50 seconds
 
-console.log('Starting auto-fetch every 30 seconds...');
+console.log('Starting auto-fetch every 50 seconds...');

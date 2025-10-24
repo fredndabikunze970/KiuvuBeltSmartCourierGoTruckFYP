@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Box, Clock, DollarSign, PackageCheck, Truck, TrendingUp, Users, MapPin } from 'lucide-react';
+import { Box, Clock, DollarSign, MapPin, PackageCheck, TrendingUp, Truck, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -216,9 +216,19 @@ const AnalyticsContent = () => {
     }
   };
 
+  // Helper to attach Authorization header from localStorage token
+  const getAuthHeaders = () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('kivu_belt_token') : ''
+      return token ? { Authorization: `Bearer ${token}` } : {}
+    } catch (err) {
+      return {}
+    }
+  }
+
   const fetchPackageStatus = async () => {
     try {
-      const res = await fetch('/api/analytics/package-status');
+  const res = await fetch('/api/analytics/package-status', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 
@@ -240,7 +250,7 @@ const AnalyticsContent = () => {
 
   const fetchPackagesOverTime = async (interval: string) => {
     try {
-      const res = await fetch(`/api/analytics/packages-over-time?interval=${interval}`);
+  const res = await fetch(`/api/analytics/packages-over-time?interval=${interval}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 
@@ -257,7 +267,7 @@ const AnalyticsContent = () => {
 
   const fetchPackagesByBranch = async () => {
     try {
-      const res = await fetch('/api/analytics/packages-by-branch');
+  const res = await fetch('/api/analytics/packages-by-branch', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 
@@ -274,7 +284,7 @@ const AnalyticsContent = () => {
 
   const fetchAverageDeliveryTime = async () => {
     try {
-      const res = await fetch('/api/analytics/average-delivery-time');
+  const res = await fetch('/api/analytics/average-delivery-time', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 
@@ -291,7 +301,7 @@ const AnalyticsContent = () => {
 
   const fetchRevenueOverTime = async (interval: string) => {
     try {
-      const res = await fetch(`/api/analytics/revenue-over-time?interval=${interval}`);
+  const res = await fetch(`/api/analytics/revenue-over-time?interval=${interval}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 
@@ -314,7 +324,7 @@ const AnalyticsContent = () => {
 
   const fetchDriverPerformance = async () => {
     try {
-      const res = await fetch('/api/analytics/driver-performance');
+  const res = await fetch('/api/analytics/driver-performance', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const { success, data } = await res.json();
 

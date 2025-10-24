@@ -149,7 +149,7 @@ export const UserDropdown = ({ user, logout, getInitials, getRoleBadgeColor, isL
 
               <DropdownMenuItem asChild>
                 <Link
-                  href="/dashboard/settings"
+                  href="/dashboard/account"
                   className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
                   onClick={() => setOpen(false)}
                 >

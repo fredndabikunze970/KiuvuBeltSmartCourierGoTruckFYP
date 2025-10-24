@@ -1,6 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge";
+import { authService } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Bell, CheckCircle2, Mail, Package, Shield, Truck, User } from "lucide-react";
 import { useState } from "react";
@@ -42,6 +43,7 @@ const NotificationCard = ({
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          ...authService.getAuthHeaders(),
         },
         body: JSON.stringify({ notificationId: notification_id }),
       });

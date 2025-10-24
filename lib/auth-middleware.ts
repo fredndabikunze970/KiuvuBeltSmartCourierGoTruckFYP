@@ -1,5 +1,5 @@
-import jwt from "jsonwebtoken"
 import { sql } from "@/lib/database"
+import jwt from "jsonwebtoken"
 import type { NextRequest } from "next/server"
 
 export interface AuthUser {
@@ -13,24 +13,69 @@ export interface AuthUser {
 export function verifyToken(token: string): AuthUser | null {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+
+    // Some tokens use different claim names - be flexible
+    const userId = decoded.user_id || decoded.userId || decoded.id || decoded.sub || null
+    const email = decoded.email || decoded.mail || null
+    const role = decoded.role || decoded.user_role || null
+
+    if (!userId) return null
+
     return {
-      id: decoded.id,
-      user_id: decoded.user_id,
-      email: decoded.email,
-      role: decoded.role,
+      id: decoded.id || 0,
+      user_id: String(userId),
+      email: email || '',
+      role: role || 'customer',
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Surface jwt verification errors for debugging (no token value logged)
+    try {
+      console.warn('JWT verification failed:', error && error.message ? error.message : String(error))
+    } catch {}
     return null
   }
 }
 
 export async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
+  // Check Authorization header (Bearer)
+  let token: string | null = null
   const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7)
+  }
+
+  // Fallback: x-access-token header (some clients use this)
+  if (!token) {
+    const alt = request.headers.get("x-access-token")
+    if (alt) token = alt
+  }
+
+  // Fallback: cookie (useful when frontend sets cookie for server-side requests)
+  if (!token && typeof request.cookies?.get === 'function') {
+    try {
+      const cookieToken = request.cookies.get('kivu_belt_token')?.value
+      if (cookieToken) token = cookieToken
+    } catch (err) {
+      // ignore cookie read errors
+    }
+  }
+
+  // Fallback: query string ?token=...
+  if (!token) {
+    try {
+      const url = new URL(request.url)
+      const q = url.searchParams.get('token')
+      if (q) token = q
+    } catch (err) {
+      // ignore URL parse errors
+    }
+  }
+
+  if (!token) {
+    // No token found in any fallback location
     return null
   }
 
-  const token = authHeader.substring(7)
   const decoded = verifyToken(token)
   if (!decoded) return null
 
@@ -39,7 +84,12 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
     const userResult = await sql`
       SELECT id, user_id, email, role, branch_id FROM users WHERE user_id = ${decoded.user_id}
     `
-    if (userResult.length === 0) return null
+    if (userResult.length === 0) {
+      try {
+        console.warn('Auth token decoded to user_id but no DB user found for:', decoded.user_id)
+      } catch {}
+      return null
+    }
 
     return {
       id: userResult[0].id,
@@ -58,6 +108,18 @@ export function requireAuth(handler: (request: NextRequest, user: AuthUser) => P
   return async (request: NextRequest) => {
     const user = await getAuthUser(request)
     if (!user) {
+      // Diagnostic: log which token sources were present (without revealing token values)
+      try {
+        const hasAuthHeader = !!request.headers.get('authorization')
+        const hasAltHeader = !!request.headers.get('x-access-token')
+        let hasCookie = false
+        try { hasCookie = typeof request.cookies?.get === 'function' && !!request.cookies.get('kivu_belt_token') } catch (e) { hasCookie = false }
+        let hasQuery = false
+        try { hasQuery = !!(new URL(request.url).searchParams.get('token')) } catch (e) { hasQuery = false }
+        console.warn('Unauthorized request to', request.method, request.url, { hasAuthHeader, hasAltHeader, hasCookie, hasQuery })
+      } catch (logErr) {
+        // ignore logging errors
+      }
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },

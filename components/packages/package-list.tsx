@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+// dialog handled by PackageDetailsModal
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { PackageDetailsModal } from "./package-details-modal"
 import { PackageListSkeleton } from "./package-list-skeleton"
 
 const statusConfig = {
@@ -500,68 +501,36 @@ export function PackageList() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex gap-2 items-center">
-                                  <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                                    <DialogTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label={`View details for ${pkg.package_id}`}
-                                        title={`View details for ${pkg.package_id}`}
-                                        className="h-8 px-2 py-1 flex items-center gap-2 hover:bg-blue-50 hover:text-blue-700"
-                                        onClick={async (e) => {
-                                          e.preventDefault()
-                                          setDetailLoading(true)
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={`View details for ${pkg.package_id}`}
+                                      title={`View details for ${pkg.package_id}`}
+                                      className="h-8 px-2 py-1 flex items-center gap-2 hover:bg-blue-50 hover:text-blue-700"
+                                      onClick={async (e) => {
+                                        e.preventDefault()
+                                        setDetailLoading(true)
+                                        try {
+                                          const res = await apiService.getPackage(pkg.package_id)
+                                          setDetailPkg(res.package)
+                                          setDetailTracking(res.tracking || [])
                                           setDetailOpen(true)
-                                          try {
-                                            const res = await apiService.getPackage(pkg.package_id)
-                                            setDetailPkg(res.package)
-                                            setDetailTracking(res.tracking || [])
-                                          } catch (err) {
-                                            console.error('Failed to load package details', err)
-                                            setDetailPkg(null)
-                                            setDetailTracking([])
-                                          } finally {
-                                            setDetailLoading(false)
-                                          }
-                                        }}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                        <span className="hidden sm:inline text-sm">Details</span>
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                      <DialogHeader>
-                                        <DialogTitle>Package Details</DialogTitle>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        {detailLoading && <div>Loading...</div>}
-                                        {!detailLoading && detailPkg && (
-                                          <div>
-                                            <p className="font-semibold">{detailPkg.package_id} — {detailPkg.status}</p>
-                                            <p className="text-sm text-muted-foreground">Sender: {detailPkg.sender_name} ({detailPkg.sender_phone})</p>
-                                            <p className="text-sm text-muted-foreground">Receiver: {detailPkg.receiver_name} ({detailPkg.receiver_phone})</p>
-                                            <div className="mt-3">
-                                              <h4 className="font-medium">Recent Tracking</h4>
-                                              <ul className="text-sm list-disc list-inside mt-2">
-                                                {detailTracking && detailTracking.length === 0 && <li>No tracking entries</li>}
-                                                {detailTracking && detailTracking.map((t) => (
-                                                  <li key={t.id}>{new Date(t.created_at).toLocaleString()} — {t.status} — {t.location_name ?? t.notes ?? ''}</li>
-                                                ))}
-                                              </ul>
-                                            </div>
-                                          </div>
-                                        )}
-                                        {!detailLoading && !detailPkg && (
-                                          <div className="text-sm text-red-600">Failed to load details.</div>
-                                        )}
-                                      </div>
-                                      <div className="mt-4 text-right">
-                                        <DialogClose asChild>
-                                          <Button variant="outline">Close</Button>
-                                        </DialogClose>
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
+                                        } catch (err) {
+                                          console.error('Failed to load package details', err)
+                                          setDetailPkg(null)
+                                          setDetailTracking([])
+                                        } finally {
+                                          setDetailLoading(false)
+                                        }
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                      <span className="hidden sm:inline text-sm">Details</span>
+                                    </Button>
+
+                                    <PackageDetailsModal packageData={detailPkg} open={detailOpen} onOpenChange={setDetailOpen} />
+                                  </>
 
                                   <Link href={`/dashboard/packages/${pkg.package_id}/update`}>
                                     <Button

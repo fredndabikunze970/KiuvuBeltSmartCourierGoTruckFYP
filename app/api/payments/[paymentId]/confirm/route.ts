@@ -33,18 +33,79 @@ async function handleConfirmPayment(
 
     const { paymentId } = params
     let data: { payment_method?: string } = {}
+    const ct = request.headers.get('content-type') || ''
+
+    // Read the body as text first to avoid stream consumption issues
+    let bodyText = ''
     try {
-      data = await request.json()
+      bodyText = await request.text()
     } catch (e) {
-      // No JSON body sent, keep data as empty object
+      console.warn('Failed to read request body as text', { paymentId, contentType: ct })
+        // As a last resort, try to read raw bytes and decode - some clients send unusual encodings
+        try {
+          const buf = await request.arrayBuffer()
+          if (buf && buf.byteLength > 0) {
+            const txt = new TextDecoder().decode(buf)
+            try {
+              data = JSON.parse(txt)
+            } catch (parseErr) {
+              console.warn('Failed to parse JSON from raw bytes after fallback', { paymentId, contentType: ct, length: buf.byteLength })
+            }
+          } else {
+            console.warn('Empty request body for JSON content-type after arrayBuffer fallback', { paymentId, contentType: ct })
+          }
+        } catch (abErr) {
+          console.warn('Failed to read request body as text or arrayBuffer', { paymentId, contentType: ct })
+        }
     }
 
-    // Validate required fields - ONLY payment_method is required now
+    if (ct.includes('application/json') && bodyText.trim()) {
+      try {
+        data = JSON.parse(bodyText)
+      } catch (parseErr) {
+        console.warn('Failed to parse JSON body', { paymentId, contentType: ct, bodyLength: bodyText.length })
+      }
+    } else if (ct.includes('application/x-www-form-urlencoded') && bodyText.trim()) {
+      const params = new URLSearchParams(bodyText)
+      data.payment_method = params.get('payment_method') || undefined
+    } else if (ct.includes('multipart/form-data') && bodyText.trim()) {
+      // For multipart, we need to parse differently, but for simplicity, try to extract payment_method
+      const formMatch = bodyText.match(/name="payment_method"[\s\S]*?\r?\n\r?\n([^\r\n]+)/)
+      if (formMatch) {
+        data.payment_method = formMatch[1]
+      }
+    } else if (!ct && bodyText.trim()) {
+      // No content-type: try JSON first, then treat as raw payment_method
+      try {
+        data = JSON.parse(bodyText)
+      } catch {
+        // If not JSON, assume the body is the payment_method value
+        data.payment_method = bodyText.trim()
+      }
+    }
+
+    // Fallbacks: allow payment_method via query param or custom header for integration compatibility
     if (!data.payment_method) {
-      return NextResponse.json(
-        { error: "Missing required field: payment_method is required" },
-        { status: 400 }
-      )
+      const url = new URL(request.url)
+      const pm = url.searchParams.get('payment_method') || url.searchParams.get('paymentMethod') || url.searchParams.get('method') || request.headers.get('x-payment-method') || request.headers.get('x-paymentmethod') || request.headers.get('x-method') || undefined
+      if (pm) data.payment_method = pm as string
+    }
+
+    // Also accept alternative field names from parsed body
+    if (!data.payment_method && typeof data === 'object' && data !== null) {
+      const alt = (data as any).paymentMethod || (data as any).method || (data as any).payment_type || (data as any).method_type || (data as any).pm
+      if (alt && typeof alt === 'string') data.payment_method = alt
+      // If body contains nested envelope like { data: { payment_method: 'cash' } }
+      if (!data.payment_method && (data as any).data && typeof (data as any).data === 'object') {
+        const nested = (data as any).data
+        const nestedAlt = nested.payment_method || nested.paymentMethod || nested.method
+        if (nestedAlt && typeof nestedAlt === 'string') data.payment_method = nestedAlt
+      }
+    }
+
+    // Default to 'cash' if payment_method is not provided
+    if (!data.payment_method) {
+      data.payment_method = 'cash'
     }
 
     // First check if payment exists and is in pending state

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { Bell, CheckCheck, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -125,7 +125,10 @@ export const NotificationDropdown = () => {
       setNotifications((prev) => prev?.map((n) => ({ ...n, status: "read" })) ?? null)
       await fetch("/api/notifications", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authService.getAuthHeaders(),
+        },
         body: JSON.stringify({ markAllAsRead: true }),
       })
     } catch (e) {

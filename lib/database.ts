@@ -1,7 +1,11 @@
 import { neon } from "@neondatabase/serverless";
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set")
+  throw new Error(
+    "DATABASE_URL environment variable is not set.\n" +
+      "Set DATABASE_URL to your Postgres connection string (e.g. postgres://user:pass@host:5432/dbname)\n" +
+      "During local development you can add it to a .env file or set it in your shell."
+  )
 }
 
 export const sql = neon(process.env.DATABASE_URL)

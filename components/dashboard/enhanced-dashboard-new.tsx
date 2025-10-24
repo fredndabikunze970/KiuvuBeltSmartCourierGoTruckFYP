@@ -1227,7 +1227,7 @@ export function EnhancedDashboardNew() {
                 {/* Other Vehicles History */}
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* Vehicle Location History */}
-                    <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm">
+                    {/* <Card className="bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center space-x-2 text-gray-900">
                                 <div className="text-amber-600">📜</div>
@@ -1237,10 +1237,10 @@ export function EnhancedDashboardNew() {
                         <CardContent>
                             <DashboardVehicleHistory locationHistory={stats.locationHistory} />
                         </CardContent>
-                    </Card>
+                    </Card> */}
 
                     {/* Fleet Status Summary */}
-                    <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm">
+                    {/* <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center space-x-2 text-slate-800">
                                 <div className="text-green-600">🚚</div>
@@ -1267,7 +1267,7 @@ export function EnhancedDashboardNew() {
                                 </div>
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card> */}
                 </div>
             </div>
         </div>

@@ -22,7 +22,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const data = await request.json()
+    // Read the body as text first to avoid stream consumption issues
+    let bodyText = ''
+    try {
+      bodyText = await request.text()
+    } catch (e) {
+      console.warn('Failed to read request body as text for package registration')
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
+
+    let data
+    try {
+      data = JSON.parse(bodyText)
+    } catch (parseErr) {
+      console.warn('Failed to parse JSON body for package registration', { bodyLength: bodyText.length })
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
     const package_id = generatePackageId()
     const pickup_code = generatePickupCode()
 

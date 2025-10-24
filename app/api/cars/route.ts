@@ -6,15 +6,20 @@ export async function GET() {
   try {
     console.log('Fetching cars...');
     const cars = await sql`
-      SELECT 
+      SELECT DISTINCT
         c.*,
         b.branch_name,
         b.branch_id,
         d.driver_id as assigned_driver_id,
-        d.full_name as assigned_driver_name 
-      FROM cars c 
+        d.full_name as assigned_driver_name
+      FROM cars c
       LEFT JOIN branches b ON c.branch_id = b.branch_id
-      LEFT JOIN drivers d ON d.assigned_car = c.car_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (assigned_car) assigned_car, driver_id, full_name
+        FROM drivers
+        WHERE assigned_car IS NOT NULL
+        ORDER BY assigned_car, driver_id
+      ) d ON d.assigned_car = c.car_id
       ORDER BY c.created_at DESC
     `
     console.log('Cars fetched:', cars.length);

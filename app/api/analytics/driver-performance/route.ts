@@ -1,37 +1,57 @@
 import { db } from "@/lib/database";
-import { NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth-middleware";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let queryText = `
+      SELECT
+        d.driver_id,
+        d.full_name as driver_name,
+        COUNT(p.id) as total_assignments,
+        COUNT(CASE WHEN p.status = $1 THEN 1 END) as deliveries_completed,
+        COUNT(CASE WHEN p.status = $2 THEN 1 END) as deliveries_in_progress,
+        ROUND(CAST(
+          CAST(COUNT(CASE WHEN p.status = $1 THEN 1 END) AS FLOAT) /
+          NULLIF(COUNT(p.id), 0) * 100
+          AS numeric), 2) as completion_rate,
+        ROUND(CAST(AVG(
+          CASE
+            WHEN p.status = $1
+            THEN EXTRACT(EPOCH FROM (p.delivered_at - p.created_at)) / 3600
+            ELSE NULL
+          END
+        ) AS numeric), 2) as avg_delivery_hours
+      FROM
+        drivers d
+      LEFT JOIN
+        packages p ON d.driver_id = p.assigned_driver
+    `
+
+    const values = ['delivered', 'in_transit']
+
+    // Add role-based filtering
+    if (user.role === 'agent') {
+      queryText += ` WHERE p.origin_branch_id = $3 OR p.destination_branch_id = $3`
+      values.push(user.branch_id || '')
+    }
+
+    queryText += `
+      GROUP BY
+        d.driver_id, d.full_name
+      ORDER BY
+        deliveries_completed DESC
+    `
+
     const result = await db.query({
-      text: `
-        SELECT 
-          d.driver_id,
-          d.full_name as driver_name,
-          COUNT(p.id) as total_assignments,
-          COUNT(CASE WHEN p.status = $1 THEN 1 END) as deliveries_completed,
-          COUNT(CASE WHEN p.status = $2 THEN 1 END) as deliveries_in_progress,
-          ROUND(CAST(
-            CAST(COUNT(CASE WHEN p.status = $1 THEN 1 END) AS FLOAT) / 
-            NULLIF(COUNT(p.id), 0) * 100
-            AS numeric), 2) as completion_rate,
-          ROUND(CAST(AVG(
-            CASE 
-              WHEN p.status = $1 
-              THEN EXTRACT(EPOCH FROM (p.delivered_at - p.created_at)) / 3600
-              ELSE NULL 
-            END
-          ) AS numeric), 2) as avg_delivery_hours
-        FROM 
-          drivers d
-        LEFT JOIN 
-          packages p ON d.driver_id = p.assigned_driver
-        GROUP BY 
-          d.driver_id, d.full_name
-        ORDER BY 
-          deliveries_completed DESC
-      `,
-      values: ['delivered', 'in_transit']
+      text: queryText,
+      values: values
     }) as {
       driver_id: string;
       driver_name: string;
@@ -55,6 +75,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: formattedData
+    }, {
+      headers: { 'Cache-Control': 'no-store' }
     })
   } catch (error) {
     console.error("Error fetching driver performance:", error)

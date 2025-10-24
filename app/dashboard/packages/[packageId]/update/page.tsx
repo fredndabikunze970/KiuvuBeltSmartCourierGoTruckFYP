@@ -1,341 +1,606 @@
 "use client"
 
-import { ProtectedRoute } from "@/components/auth/protected-route"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import PackageEditForm from "@/components/packages/package-edit-form"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { apiService, type Package } from "@/lib/api"
-import { ArrowLeft, FileText, Loader2, MapPin, PackageIcon, Scale, Truck, User } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import { authService } from '@/lib/auth'
+import { ArrowLeft, Car, Loader2, MapPin, Package as PackageIcon, Save, TrendingUp, User } from "lucide-react"
 import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
-interface DashboardUpdatePackagePageProps {
-  params: {
-    packageId: string
-  }
+type PackageData = {
+  package_id: string
+  tracking_number: string
+  status: string
+  sender_name: string
+  sender_phone: string
+  sender_address: string
+  receiver_name: string
+  receiver_phone: string
+  receiver_address: string
+  weight_kg: number
+  dimensions: string
+  description: string
+  special_instructions: string
+  origin_branch: string
+  destination_branch: string
+  assigned_car: string
+  agent_id: string
+  created_at: string
+  updated_at: string
+  origin_branch_name?: string
+  destination_branch_name?: string
+  assigned_car_plate?: string
+  agent_name?: string
 }
 
-export default function DashboardUpdatePackagePage({ params }: DashboardUpdatePackagePageProps) {
-  const [packageData, setPackageData] = useState<Package | null>(null)
-  const [tracking, setTracking] = useState<any[]>([])
+type Branch = {
+  branch_id: string
+  branch_name: string
+}
+
+type Car = {
+  car_id: string
+  plate_number: string
+  model: string
+  status: string
+}
+
+type Driver = {
+  user_id: string
+  full_name: string
+  phone: string
+}
+
+export default function PackageUpdatePage() {
+  const params = useParams()
+  const router = useRouter()
+  const packageId = params.packageId as string
+  const { toast } = useToast()
+
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [packageData, setPackageData] = useState<PackageData | null>(null)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [cars, setCars] = useState<Car[]>([])
+  const [drivers, setDrivers] = useState<Driver[]>([])
+  const [userRole, setUserRole] = useState<string>("")
+
+  const [formData, setFormData] = useState({
+    status: "",
+    sender_name: "",
+    sender_phone: "",
+    sender_address: "",
+    receiver_name: "",
+    receiver_phone: "",
+    receiver_address: "",
+    weight_kg: 0,
+    dimensions: "",
+    description: "",
+    special_instructions: "",
+    origin_branch: "",
+    destination_branch: "",
+    assigned_car: "",
+    assigned_driver: "",
+    notes: "",
+  })
+
+  useEffect(() => {
+    fetchPackageData()
+    fetchBranches()
+    fetchCars()
+    fetchDrivers()
+    fetchUserRole()
+  }, [packageId])
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await fetch("/api/user/profile", { headers: authService.getAuthHeaders() })
+      if (response.ok) {
+        const data = await response.json()
+        setUserRole(data.user.role)
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error)
+    }
+  }
 
   const fetchPackageData = async () => {
     try {
-      setLoading(true)
-      const response = await apiService.getPackage(params.packageId)
-      setPackageData(response.package)
-      setTracking(response.tracking || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch package data")
+      const response = await fetch(`/api/packages/${packageId}`, { headers: authService.getAuthHeaders() })
+      if (!response.ok) throw new Error("Failed to fetch package")
+
+      const data = await response.json()
+      const pkg = data.package
+
+      setPackageData(pkg)
+      setFormData({
+        status: pkg.status || "",
+        sender_name: pkg.sender_name || "",
+        sender_phone: pkg.sender_phone || "",
+        sender_address: pkg.sender_address || "",
+        receiver_name: pkg.receiver_name || "",
+        receiver_phone: pkg.receiver_phone || "",
+        receiver_address: pkg.receiver_address || "",
+        // DB may use 'weight' or 'weight_kg'
+        weight_kg: pkg.weight_kg ?? pkg.weight ?? 0,
+        dimensions: pkg.dimensions || "",
+        // DB may use 'package_description' or 'description'
+        description: pkg.package_description ?? pkg.description ?? "",
+        special_instructions: pkg.special_instructions || "",
+        origin_branch: pkg.origin_branch_id ?? pkg.origin_branch ?? "",
+        destination_branch: pkg.destination_branch_id ?? pkg.destination_branch ?? "",
+  assigned_car: pkg.assigned_car || "",
+  assigned_driver: (pkg.assigned_driver ?? pkg.agent_id) ?? "",
+        notes: "",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load package data",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchPackageData()
-  }, [params.packageId])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200"
-      case "cancelled":
-        return "bg-rose-50 text-rose-700 border-rose-200"
-      case "in_transit":
-        return "bg-blue-50 text-blue-700 border-blue-200"
-      case "out_for_delivery":
-        return "bg-amber-50 text-amber-700 border-amber-200"
-      case "picked_up":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200"
-      default:
-        return "bg-slate-50 text-slate-700 border-slate-200"
+  const fetchBranches = async () => {
+    try {
+      const response = await fetch("/api/branches", { headers: authService.getAuthHeaders() })
+      if (response.ok) {
+        const data = await response.json()
+        setBranches(data.branches || [])
+      }
+    } catch (error) {
+      console.error("Error fetching branches:", error)
     }
   }
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "default"
-      case "cancelled":
-        return "destructive"
-      default:
-        return "secondary"
+  const fetchCars = async () => {
+    try {
+      const response = await fetch("/api/cars", { headers: authService.getAuthHeaders() })
+      if (response.ok) {
+        const data = await response.json()
+        setCars(data.cars || [])
+      }
+    } catch (error) {
+      console.error("Error fetching cars:", error)
     }
   }
+
+  const fetchDrivers = async () => {
+    try {
+      const response = await fetch("/api/drivers", { headers: authService.getAuthHeaders() })
+      if (response.ok) {
+        const data = await response.json()
+        setDrivers(data.drivers || [])
+      }
+    } catch (error) {
+      console.error("Error fetching drivers:", error)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+
+    try {
+      const response = await fetch(`/api/packages/${packageId}/update`, {
+        method: "PUT",
+        headers: { ...authService.getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update package")
+      }
+
+      toast({
+        title: "Success",
+        description: "Package updated successfully",
+      })
+
+      // Refresh package data
+      await fetchPackageData()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update package",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const statusOptions = [
+    { value: "registered", label: "Registered" },
+    { value: "picked_up", label: "Picked Up" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "out_for_delivery", label: "Out for Delivery" },
+    { value: "arrived", label: "Arrived" },
+    { value: "delivered", label: "Delivered" },
+    { value: "cancelled", label: "Cancelled" },
+  ]
 
   if (loading) {
     return (
-      <ProtectedRoute requiredRole="agent">
-        <DashboardLayout>
-          <div className="container mx-auto py-8">
-            <div className="flex items-center justify-center p-12">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <p className="text-slate-600">Loading package details...</p>
-              </div>
-            </div>
-          </div>
-        </DashboardLayout>
-      </ProtectedRoute>
-    )
-  }
-
-  if (error || !packageData) {
-    return (
-      <ProtectedRoute requiredRole="agent">
-        <DashboardLayout>
-          <div className="container mx-auto py-8">
-            <div className="text-center p-12">
-              <div className="w-16 h-16 mx-auto mb-4 bg-rose-50 rounded-full flex items-center justify-center">
-                <PackageIcon className="h-8 w-8 text-rose-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Package Not Found</h3>
-              <p className="text-slate-600 mb-6 max-w-md mx-auto">{error || "The requested package could not be found."}</p>
-              <Link href="/dashboard/packages">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Packages
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </DashboardLayout>
-      </ProtectedRoute>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <ProtectedRoute requiredRole="agent">
-      <DashboardLayout>
-        <div className="container mx-auto py-8">
-          <div className="space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Link href={`/dashboard/packages/${params.packageId}`}>
-                  <Button variant="outline" size="sm" className="border-slate-300 hover:bg-slate-50">
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-bold text-slate-900">Edit Package</h1>
-                  <p className="text-slate-600 mt-1">Update package information and tracking details</p>
-                </div>
+    <DashboardLayout>
+      <div className="container mx-auto py-6 max-w-6xl">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/packages">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Update Package
+              </h2>
+              <p className="text-muted-foreground">
+                {packageData?.tracking_number} • Last updated: {packageData?.updated_at ? new Date(packageData.updated_at).toLocaleString() : "N/A"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Package Info Card */}
+        <div className="mb-6 rounded-lg border bg-card p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                <PackageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <Badge
-                className={`${getStatusColor(packageData.status)} border px-3 py-1 font-medium`}
-                variant={getStatusVariant(packageData.status) as any}
-              >
-                {packageData.status.replace("_", " ").toUpperCase()}
-              </Badge>
+              <div>
+                <p className="text-xs text-muted-foreground">Package ID</p>
+                <p className="font-semibold">{packageData?.package_id}</p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-              {/* Left Column - Package Summary & Tracking */}
-              <div className="xl:col-span-1 space-y-6">
-                {/* Package Summary */}
-                <Card className="border-slate-200 shadow-sm">
-                  <CardHeader className="pb-4 border-b border-slate-100">
-                    <CardTitle className="flex items-center gap-2 text-slate-900 text-lg">
-                      <PackageIcon className="h-5 w-5 text-blue-600" />
-                      Package Summary
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-6">
-                    {/* Sender & Receiver */}
-                    <div className="grid grid-cols-1 gap-6">
-                      <div className="bg-slate-50 rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <User className="h-4 w-4 text-blue-600" />
-                          <p className="text-sm font-semibold text-slate-700">Sender</p>
-                        </div>
-                        <p className="font-medium text-slate-900">{packageData.sender_name}</p>
-                        <p className="text-sm text-slate-600 mt-1">{packageData.sender_phone}</p>
-                      </div>
-
-                      <div className="bg-slate-50 rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <User className="h-4 w-4 text-green-600" />
-                          <p className="text-sm font-semibold text-slate-700">Receiver</p>
-                        </div>
-                        <p className="font-medium text-slate-900">{packageData.receiver_name}</p>
-                        <p className="text-sm text-slate-600 mt-1">{packageData.receiver_phone}</p>
-                      </div>
-                    </div>
-
-                    {/* Package Details */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-600">Priority</span>
-                        <Badge variant="outline" className="uppercase font-medium border-blue-200 text-blue-700">
-                          {packageData.priority}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-600">Delivery Fee</span>
-                        <span className="font-semibold text-slate-900">
-                          {typeof packageData.delivery_fee === 'number'
-                            ? `UGX ${packageData.delivery_fee.toLocaleString()}`
-                            : packageData.delivery_fee}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Branch Information */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                        <MapPin className="h-4 w-4 text-blue-600" />
-                        Branch Information
-                      </div>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Origin</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.origin_branch_name || packageData.origin_branch_id}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Destination</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.destination_branch_name || packageData.destination_branch_id}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Assignment Details */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                        <Truck className="h-4 w-4 text-blue-600" />
-                        Assignment
-                      </div>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Vehicle</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.car_model
-                              ? `${packageData.car_model} • ${packageData.car_plate_number}`
-                              : (packageData.assigned_car || 'Unassigned')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Driver</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.driver_name || packageData.assigned_driver || 'Unassigned'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Package Specifications */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                        <Scale className="h-4 w-4 text-blue-600" />
-                        Specifications
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Weight</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.weight ? `${packageData.weight} kg` : '—'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Value</p>
-                          <p className="text-sm font-medium text-slate-900 mt-1">
-                            {packageData.declared_value ? `RWF ${packageData.declared_value}` : '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    {packageData.package_description && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <FileText className="h-4 w-4 text-blue-600" />
-                          Description
-                        </div>
-                        <p className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3">
-                          {packageData.package_description}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Tracking History */}
-                <Card className="border-slate-200 shadow-sm">
-                  <CardHeader className="pb-4 border-b border-slate-100">
-                    <CardTitle className="text-slate-900 text-lg">Tracking History</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    {tracking.length === 0 ? (
-                      <div className="text-center py-8">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-slate-100 rounded-full flex items-center justify-center">
-                          <MapPin className="h-6 w-6 text-slate-400" />
-                        </div>
-                        <p className="text-slate-500 text-sm">No tracking entries yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {tracking.slice(0, 5).map((t, index) => (
-                          <div key={t.id} className="flex gap-4 group">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-blue-500' : 'bg-slate-300'
-                                }`} />
-                              {index < tracking.slice(0, 5).length - 1 && (
-                                <div className="w-0.5 h-full bg-slate-200 mt-1" />
-                              )}
-                            </div>
-                            <div className="flex-1 pb-4 group-last:pb-0">
-                              <p className="font-medium text-slate-900 capitalize">
-                                {t.status?.replace(/_/g, ' ') || 'Update'}
-                              </p>
-                              <p className="text-sm text-slate-600 mt-1">
-                                {t.location_name || '—'} {t.notes && `• ${t.notes}`}
-                              </p>
-                              <div className="flex justify-between items-center mt-2">
-                                <p className="text-xs text-slate-500">
-                                  {t.updated_by_name || t.updated_by}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {new Date(t.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Current Status</p>
+                <p className="font-semibold capitalize">{packageData?.status?.replace('_', ' ')}</p>
+              </div>
+            </div>
 
-              {/* Right Column - Edit Form */}
-              <div className="xl:col-span-3">
-                <Card className="border-slate-200 shadow-sm">
-                  <CardHeader className="pb-4 border-b border-slate-100 bg-slate-50 rounded-t-lg">
-                    <CardTitle className="text-slate-900 text-xl">Edit Package Details</CardTitle>
-                    <p className="text-sm text-slate-600 mt-1">
-                      Update package information, tracking status, and assignment details
-                    </p>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <PackageEditForm pkg={packageData} onSaved={fetchPackageData} />
-                  </CardContent>
-                </Card>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                <MapPin className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Origin</p>
+                <p className="font-semibold truncate">{packageData?.origin_branch_name || "N/A"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                <MapPin className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Destination</p>
+                <p className="font-semibold truncate">{packageData?.destination_branch_name || "N/A"}</p>
               </div>
             </div>
           </div>
         </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+
+        {/* Update Form */}
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-6">
+            {/* Status & Assignment Section */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Status & Assignment
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Package Status *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_car">Assigned Vehicle</Label>
+                  <Select
+                    value={formData.assigned_car}
+                    onValueChange={(value) => setFormData({ ...formData, assigned_car: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vehicle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Vehicle</SelectItem>
+                      {cars.map((car) => (
+                        <SelectItem key={car.car_id} value={car.car_id}>
+                          {car.plate_number} - {car.model} ({car.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_driver">Assigned Driver</Label>
+                  <Select
+                    value={formData.assigned_driver}
+                    onValueChange={(value) => setFormData({ ...formData, assigned_driver: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select driver" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Driver</SelectItem>
+                      {drivers.map((driver) => (
+                        <SelectItem key={driver.user_id} value={driver.user_id}>
+                          {driver.full_name} - {driver.phone}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="notes">Update Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Add notes about this update..."
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sender Information */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Sender Information
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sender_name">Sender Name *</Label>
+                  <Input
+                    id="sender_name"
+                    value={formData.sender_name}
+                    onChange={(e) => setFormData({ ...formData, sender_name: e.target.value })}
+                    placeholder="Enter sender name"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sender_phone">Sender Phone *</Label>
+                  <Input
+                    id="sender_phone"
+                    value={formData.sender_phone}
+                    onChange={(e) => setFormData({ ...formData, sender_phone: e.target.value })}
+                    placeholder="+250788123456"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="sender_address">Sender Address *</Label>
+                  <Textarea
+                    id="sender_address"
+                    value={formData.sender_address}
+                    onChange={(e) => setFormData({ ...formData, sender_address: e.target.value })}
+                    placeholder="Enter sender address"
+                    rows={2}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Receiver Information */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Receiver Information
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="receiver_name">Receiver Name *</Label>
+                  <Input
+                    id="receiver_name"
+                    value={formData.receiver_name}
+                    onChange={(e) => setFormData({ ...formData, receiver_name: e.target.value })}
+                    placeholder="Enter receiver name"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="receiver_phone">Receiver Phone *</Label>
+                  <Input
+                    id="receiver_phone"
+                    value={formData.receiver_phone}
+                    onChange={(e) => setFormData({ ...formData, receiver_phone: e.target.value })}
+                    placeholder="+250788123456"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="receiver_address">Receiver Address *</Label>
+                  <Textarea
+                    id="receiver_address"
+                    value={formData.receiver_address}
+                    onChange={(e) => setFormData({ ...formData, receiver_address: e.target.value })}
+                    placeholder="Enter receiver address"
+                    rows={2}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Package Details */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <PackageIcon className="h-5 w-5" />
+                Package Details
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="weight_kg">Weight (kg) *</Label>
+                  <Input
+                    id="weight_kg"
+                    type="number"
+                    step="0.01"
+                    value={formData.weight_kg}
+                    onChange={(e) => setFormData({ ...formData, weight_kg: parseFloat(e.target.value) })}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dimensions">Dimensions</Label>
+                  <Input
+                    id="dimensions"
+                    value={formData.dimensions}
+                    onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
+                    placeholder="e.g., 50x40x30 cm"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="description">Description *</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the package contents"
+                    rows={3}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="special_instructions">Special Instructions</Label>
+                  <Textarea
+                    id="special_instructions"
+                    value={formData.special_instructions}
+                    onChange={(e) => setFormData({ ...formData, special_instructions: e.target.value })}
+                    placeholder="Any special handling instructions"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Route Information */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Route Information
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="origin_branch">Origin Branch *</Label>
+                  <Select
+                    value={formData.origin_branch}
+                    onValueChange={(value) => setFormData({ ...formData, origin_branch: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select origin branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                          {branch.branch_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="destination_branch">Destination Branch *</Label>
+                  <Select
+                    value={formData.destination_branch}
+                    onValueChange={(value) => setFormData({ ...formData, destination_branch: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select destination branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                          {branch.branch_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4">
+              <Link href="/dashboard/packages">
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </Link>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Update Package
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </DashboardLayout>
   )
 }

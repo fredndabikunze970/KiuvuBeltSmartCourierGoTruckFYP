@@ -217,6 +217,33 @@ class ApiService {
     })
   }
 
+  async updatePackage(
+    packageId: string,
+    data: {
+      status?: string
+      notes?: string
+      sender_name?: string
+      sender_phone?: string
+      sender_address?: string
+      receiver_name?: string
+      receiver_phone?: string
+      receiver_address?: string
+      weight_kg?: number
+      dimensions?: string
+      description?: string
+      special_instructions?: string
+      origin_branch?: string
+      destination_branch?: string
+      assigned_car?: string
+      assigned_driver?: string
+    }
+  ): Promise<{ message: string; package: Package }> {
+    return this.request(`/packages/${packageId}/update`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
   async verifyDelivery(packageId: string, pickupCode: string): Promise<{ message: string; package: Package }> {
     return this.request("/packages/verify-delivery", {
       method: "POST",
@@ -307,6 +334,42 @@ class ApiService {
     }
   }> {
     return this.request("/tracking/stats/overview")
+  }
+
+  // User Profile API methods
+  async getUserProfile(): Promise<{ user: any }> {
+    return this.request("/user/profile")
+  }
+
+  async updateUserProfile(data: {
+    full_name: string
+    phone: string
+    branch_id?: string
+  }): Promise<{ message: string; user: any }> {
+    return this.request("/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async changePassword(data: {
+    current_password: string
+    new_password: string
+    confirm_password: string
+  }): Promise<{ message: string }> {
+    return this.request("/user/password", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateEmail(data: {
+    new_email: string
+  }): Promise<{ message: string; user: any }> {
+    return this.request("/user/email", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
   }
 }
 

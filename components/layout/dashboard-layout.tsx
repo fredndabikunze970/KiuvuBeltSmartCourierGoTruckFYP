@@ -219,11 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       isActive ? "text-white" : "text-gray-500 group-hover:text-gray-700"
                     )} />
                     <span className="truncate">{item.label}</span>
-                    {item.href === "/dashboard/notifications" && (
-                      <span className="ml-auto bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                        3
-                      </span>
-                    )}
+                    {item.href === "/dashboard/notifications" }
                   </Link>
                 )
               })}
